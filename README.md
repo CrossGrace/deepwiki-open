@@ -488,6 +488,39 @@ pip install -r requirements_single.txt
 pip install httpx numpy
 ```
 
+### Docker Installation
+
+For easier deployment and environment management, you can use Docker:
+
+**Quick Start with Docker:**
+
+```bash
+# 1. Copy and configure environment file
+cp .env.example .env
+# Edit .env with your API credentials
+
+# 2. Run with Docker Compose (Full Web Application)
+docker-compose up -d
+
+# OR run CLI only
+docker-compose -f docker-compose.cli.yml run --rm deepwiki-cli \
+  --repo https://github.com/your-org/your-repo \
+  --output /app/output
+```
+
+**📚 Complete Docker Documentation:**
+- [English Docker Setup Guide](DOCKER_SETUP.md) - Complete guide with examples and troubleshooting
+- [한글 Docker 설정 가이드](DOCKER_SETUP.kr.md) - 한국어 전체 가이드
+
+**Docker Options:**
+- **Full Web Application**: Next.js frontend + FastAPI backend + CLI
+  - Use `docker-compose.yml`
+  - Ports: 3000 (frontend), 8001 (backend)
+
+- **CLI Only**: Lightweight command-line tool
+  - Use `docker-compose.cli.yml`
+  - No web interface, perfect for automation
+
 ---
 
 ## 🚀 Usage

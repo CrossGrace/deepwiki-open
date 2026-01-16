@@ -1,25 +1,71 @@
+version: '3.8'
+
 services:
   deepwiki:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        # Optional: Custom certificate directory for enterprise environments
+        CUSTOM_CERT_DIR: ${CUSTOM_CERT_DIR:-certs}
+    container_name: deepwiki-open
     ports:
-      - "${PORT:-8001}:${PORT:-8001}"  # API port
-      - "3000:3000"  # Next.js port
+      - "${PORT:-8001}:${PORT:-8001}"  # API backend port
+      - "3000:3000"                     # Next.js frontend port
     env_file:
       - .env
     environment:
+      # Application configuration
       - PORT=${PORT:-8001}
-      - NODE_ENV=production
-      - SERVER_BASE_URL=http://localhost:${PORT:-8001}
+      - NODE_ENV=${NODE_ENV:-production}
+      - SERVER_BASE_URL=${SERVER_BASE_URL:-http://localhost:8001}
+
+      # Logging configuration
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
       - LOG_FILE_PATH=${LOG_FILE_PATH:-api/logs/application.log}
+
+      # LLM API configuration (required for single-provider mode)
+      - DEEPWIKI_LLM_BASE_URL=${DEEPWIKI_LLM_BASE_URL}
+      - DEEPWIKI_LLM_TOKEN=${DEEPWIKI_LLM_TOKEN}
+
+      # Embedding API configuration (required for single-provider mode)
+      - DEEPWIKI_EMBEDDING_BASE_URL=${DEEPWIKI_EMBEDDING_BASE_URL}
+      - DEEPWIKI_EMBEDDING_TOKEN=${DEEPWIKI_EMBEDDING_TOKEN}
+
+      # Optional: Workspace and output directories
+      - DEEPWIKI_WORKSPACE=${DEEPWIKI_WORKSPACE:-./workspace}
+      - DEEPWIKI_OUTPUT=${DEEPWIKI_OUTPUT:-./wiki_output}
+
+      # Optional: Multi-provider mode (if using full version)
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY:-}
+
+      # Optional: GitHub token for private repositories
+      - GITHUB_TOKEN=${GITHUB_TOKEN:-}
     volumes:
-      - ~/.adalflow:/root/.adalflow      # Persist repository and embedding data
-      - ./api/logs:/app/api/logs          # Persist log files across container restarts
-    # Resource limits for docker-compose up (not Swarm mode)
-    mem_limit: 6g
-    mem_reservation: 2g
+      # Persist repository data and embeddings
+      - deepwiki-data:/root/.adalflow
+
+      # Persist generated wiki outputs
+      - ./output:/app/output
+
+      # Persist workspace (cloned repositories)
+      - ./workspace:/app/workspace
+
+      # Persist log files
+      - ./api/logs:/app/api/logs
+
+      # Optional: Mount custom certificates for enterprise environments
+      # Uncomment if you have custom CA certificates
+      # - ./certs:/app/certs:ro
+
+    # Resource limits (adjust based on your needs)
+    mem_limit: ${DOCKER_MEMORY_LIMIT:-6g}
+    mem_reservation: ${DOCKER_MEMORY_RESERVATION:-2g}
+
+    # Restart policy
+    restart: unless-stopped
+
     # Health check configuration
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:${PORT:-8001}/health"]
@@ -27,3 +73,17 @@ services:
       timeout: 10s
       retries: 3
       start_period: 30s
+
+    # Network configuration
+    networks:
+      - deepwiki-network
+
+# Named volumes for persistent data
+volumes:
+  deepwiki-data:
+    driver: local
+
+# Network configuration
+networks:
+  deepwiki-network:
+    driver: bridge
