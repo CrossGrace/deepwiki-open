@@ -1,658 +1,1262 @@
-# DeepWiki-Open
+# DeepWiki-Open: Single-Provider Edition
 
 ![DeepWiki Banner](screenshots/Deepwiki.png)
 
-**DeepWiki** is my own implementation attempt of DeepWiki, automatically creates beautiful, interactive wikis for any GitHub, GitLab, or BitBucket repository! Just enter a repo name, and DeepWiki will:
+**Simplified GitHub Wiki Generator for Enterprise**
 
-1. Analyze the code structure
-2. Generate comprehensive documentation
-3. Create visual diagrams to explain how everything works
-4. Organize it all into an easy-to-navigate wiki
+This is a **radically simplified** version of DeepWiki-Open, redesigned as a focused, single-provider GitHub Wiki generator for internal enterprise use. It uses **ONLY**:
+- **LLM**: `gpt-oss-130b` (internal OpenAI-compatible API)
+- **Embedding**: `BGE-M3` (1024-dimensional, internal API)
 
-[!["Buy Me A Coffee"](https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png)](https://buymeacoffee.com/sheing)
-[![Tip in Crypto](https://tip.md/badge.svg)](https://tip.md/sng-asyncfunc)
-[![Twitter/X](https://img.shields.io/badge/Twitter-1DA1F2?style=for-the-badge&logo=twitter&logoColor=white)](https://x.com/sashimikun_void)
-[![Discord](https://img.shields.io/badge/Discord-7289DA?style=for-the-badge&logo=discord&logoColor=white)](https://discord.com/invite/VQMBGR8u5v)
+> **📌 Note**: This is NOT the original multi-provider DeepWiki. For the full-featured version with web UI, multiple LLM providers, and extensive configurability, see the original [DeepWiki-Open](https://github.com/deepwiki-io/deepwiki-open).
 
-[English](./README.md) | [简体中文](./README.zh.md) | [繁體中文](./README.zh-tw.md) | [日本語](./README.ja.md) | [Español](./README.es.md) | [한국어](./README.kr.md) | [Tiếng Việt](./README.vi.md) | [Português Brasileiro](./README.pt-br.md) | [Français](./README.fr.md) | [Русский](./README.ru.md)
+---
 
-## ✨ Features
+## 📋 Table of Contents
 
-- **Instant Documentation**: Turn any GitHub, GitLab or BitBucket repo into a wiki in seconds
-- **Private Repository Support**: Securely access private repositories with personal access tokens
-- **Smart Analysis**: AI-powered understanding of code structure and relationships
-- **Beautiful Diagrams**: Automatic Mermaid diagrams to visualize architecture and data flow
-- **Easy Navigation**: Simple, intuitive interface to explore the wiki
-- **Ask Feature**: Chat with your repository using RAG-powered AI to get accurate answers
-- **DeepResearch**: Multi-turn research process that thoroughly investigates complex topics
-- **Multiple Model Providers**: Support for Google Gemini, OpenAI, OpenRouter, and local Ollama models
-- **Flexible Embeddings**: Choose between OpenAI, Google AI, or local Ollama embeddings for optimal performance
+- [Overview](#-overview)
+- [Architecture](#-architecture)
+- [Directory Structure](#-directory-structure)
+- [Core Modules](#-core-modules)
+- [Installation](#-installation)
+- [Usage](#-usage)
+- [API Requirements](#-api-requirements)
+- [Environment Variables](#-environment-variables)
+- [Code Structure Deep Dive](#-code-structure-deep-dive)
+- [Error Handling](#-error-handling)
+- [Extending the System](#-extending-the-system)
+- [Troubleshooting](#-troubleshooting)
+- [Migration Guide](#-migration-guide)
 
-## 🚀 Quick Start (Super Easy!)
+---
 
-### Option 1: Using Docker
+## 🎯 Overview
+
+### What This Is
+
+A **single-purpose tool** that transforms GitHub repositories into comprehensive Wiki documentation:
+
+```
+GitHub Repository → Analysis → Planning → Generation → GitHub Wiki
+```
+
+### Key Characteristics
+
+- ✅ **Single LLM**: gpt-oss-130b only (no provider abstraction)
+- ✅ **Single Embedder**: BGE-M3 only (1024 dimensions)
+- ✅ **No Configuration Files**: Environment variables only
+- ✅ **Linear Pipeline**: Clear, predictable flow
+- ✅ **Page-by-Page Generation**: Isolated failures, controlled output
+- ✅ **~90% Smaller**: ~1,500 lines vs ~15,000 lines
+
+### What This Is NOT
+
+- ❌ Multi-provider LLM platform
+- ❌ General-purpose documentation tool
+- ❌ Autonomous agent system
+- ❌ Web application with UI
+- ❌ Configurable via JSON files
+
+---
+
+## 🏗️ Architecture
+
+### High-Level Pipeline
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                        1. INGEST PHASE                          │
+│  Clone GitHub repo → Load source files → Filter by extension   │
+└────────────────────────────┬────────────────────────────────────┘
+                             │
+                             ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                        2. CHUNK PHASE                           │
+│     Split files into overlapping text segments (500 words)     │
+└────────────────────────────┬────────────────────────────────────┘
+                             │
+                             ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                        3. PLAN PHASE                            │
+│   LLM analyzes repo structure → Generates wiki page layout     │
+│   (NO content generation, NO autonomous exploration)           │
+└────────────────────────────┬────────────────────────────────────┘
+                             │
+                             ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                        4. EMBED PHASE                           │
+│     BGE-M3 computes 1024-dim embeddings for all chunks         │
+└────────────────────────────┬────────────────────────────────────┘
+                             │
+                             ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                     5. GENERATE PHASE                           │
+│  For each page:                                                 │
+│    → Retrieve relevant chunks (RAG)                             │
+│    → Match files from plan                                      │
+│    → Build context (max 6000 tokens)                            │
+│    → LLM generates markdown content                             │
+└────────────────────────────┬────────────────────────────────────┘
+                             │
+                             ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                        6. WRITE PHASE                           │
+│    Write .md files → Generate _Sidebar.md → Output to disk     │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Key Design Principles
+
+1. **Single Responsibility**: Each module does ONE thing
+2. **No Abstractions**: Hardcoded to gpt-oss-130b + BGE-M3
+3. **Fail Gracefully**: Page errors don't crash pipeline
+4. **Token Budget**: Strict limits prevent overflow
+5. **RAG-First**: Context retrieval before generation
+
+---
+
+## 📁 Directory Structure
+
+```
+deepwiki-open/
+│
+├── api/                                    # Core API modules
+│   │
+│   ├── llm/                                # LLM client (ONLY gpt-oss-130b)
+│   │   ├── __init__.py
+│   │   └── gpt_oss_client.py              # GPTOSSClient class
+│   │
+│   ├── embedding/                          # Embedding client (ONLY BGE-M3)
+│   │   ├── __init__.py
+│   │   └── bge_m3_client.py               # BGEM3Client class
+│   │
+│   ├── pipeline/                           # Pipeline modules
+│   │   ├── __init__.py
+│   │   ├── ingest.py                      # RepositoryIngester class
+│   │   ├── chunk.py                       # TextChunker class
+│   │   ├── plan.py                        # WikiPlanner class
+│   │   └── generate.py                    # PageGenerator class
+│   │
+│   └── wiki/                               # Wiki writer
+│       ├── __init__.py
+│       └── writer.py                      # WikiWriter class
+│
+├── deepwiki_single.py                      # Main entry point (CLI)
+│
+├── requirements_single.txt                 # Minimal dependencies
+│
+├── README.md                               # This file
+├── README_SINGLE_PROVIDER.md               # Detailed usage guide
+├── SINGLE_PROVIDER_MIGRATION.md            # Migration summary
+└── DELETED_FILES_LIST.md                   # Cleanup instructions
+
+# Legacy files (unused by deepwiki_single.py)
+├── api/config.py                          # Multi-provider config (UNUSED)
+├── api/openai_client.py                   # Old clients (UNUSED)
+├── api/data_pipeline.py                   # Complex pipeline (UNUSED)
+├── app.py                                 # FastAPI server (UNUSED)
+└── main.py                                # Old entry point (UNUSED)
+```
+
+---
+
+## 🔧 Core Modules
+
+### 1. LLM Client (`api/llm/gpt_oss_client.py`)
+
+**Purpose**: Single LLM client for gpt-oss-130b
+
+**Class**: `GPTOSSClient`
+
+**Key Methods**:
+```python
+def __init__(base_url, token, timeout=30.0, max_retries=3)
+def chat(messages: List[Dict], temperature=0.7, max_tokens=None) -> str
+def chat_with_system(system: str, user: str) -> str
+```
+
+**Features**:
+- OpenAI-compatible Chat Completions API
+- Custom `x-dep-ticket` authentication header
+- Exponential backoff retry (2s, 4s, 8s, 16s)
+- Automatic retry on HTTP 429 and 5xx errors
+- 30s timeout (configurable)
+
+**HTTP Call Pattern**:
+```python
+endpoint = f"/gpt-oss-130b/v1/chat/completions"
+payload = {
+    "model": "openai/gpt-oss-130b",
+    "messages": [{"role": "user", "content": "..."}],
+    "temperature": 0.7
+}
+response = httpx_client.post(endpoint, json=payload)
+```
+
+---
+
+### 2. Embedding Client (`api/embedding/bge_m3_client.py`)
+
+**Purpose**: Single embedding client for BGE-M3
+
+**Class**: `BGEM3Client`
+
+**Key Methods**:
+```python
+def __init__(base_url, token, batch_size=100, timeout=60.0)
+def embed(texts: List[str]) -> List[List[float]]  # Returns 1024-dim vectors
+```
+
+**Features**:
+- 1024-dimensional embeddings (BGE-M3 standard)
+- Batch processing (default: 100 texts per batch)
+- Partial failure recovery (retries individual texts on batch failure)
+- Zero vector fallback for failed embeddings
+- Custom `x-dep-ticket` authentication
+
+**HTTP Call Pattern**:
+```python
+endpoint = "/v1/embeddings"
+payload = {
+    "model": "bge-m3",
+    "input": ["text1", "text2", ...]
+}
+response = httpx_client.post(endpoint, json=payload)
+```
+
+---
+
+### 3. Repository Ingester (`api/pipeline/ingest.py`)
+
+**Purpose**: Clone repository and load source files
+
+**Class**: `RepositoryIngester`
+
+**Key Methods**:
+```python
+def __init__(workspace_dir="./workspace")
+def clone_repo(repo_url: str, access_token: str = None) -> str
+def load_files(repo_path: str) -> List[Dict[str, str]]
+```
+
+**Features**:
+- Git shallow clone (depth=1, single branch)
+- GitHub access token support for private repos
+- Simple file filtering (excludes binaries, build artifacts)
+- Returns list of {path, content, size} dictionaries
+
+**Excluded Patterns**:
+```python
+EXCLUDED_DIRS = [".git", ".venv", "node_modules", "__pycache__", ...]
+EXCLUDED_EXTENSIONS = [".pyc", ".so", ".dll", ".zip", ".jpg", ...]
+```
+
+---
+
+### 4. Text Chunker (`api/pipeline/chunk.py`)
+
+**Purpose**: Split files into overlapping text segments
+
+**Class**: `TextChunker`
+
+**Key Methods**:
+```python
+def __init__(chunk_size=500, overlap=100)  # Words, not tokens
+def chunk_files(files: List[Dict]) -> List[Dict[str, any]]
+```
+
+**Features**:
+- Word-based chunking (approximates token splitting)
+- Configurable chunk size and overlap
+- Preserves file metadata (path, chunk_id, source)
+
+**Output Format**:
+```python
+[
+    {
+        'text': 'chunk content...',
+        'file': 'src/main.py',
+        'chunk_id': 0,
+        'source': 'src/main.py#chunk0'
+    },
+    ...
+]
+```
+
+---
+
+### 5. Wiki Planner (`api/pipeline/plan.py`)
+
+**Purpose**: Plan wiki page structure (NO content generation)
+
+**Class**: `WikiPlanner`
+
+**Key Methods**:
+```python
+def __init__(llm_client: GPTOSSClient)
+def plan_wiki_structure(files: List[Dict], repo_name: str) -> List[Dict]
+```
+
+**CRITICAL CONSTRAINTS**:
+- ❌ Does NOT generate documentation content
+- ❌ Does NOT summarize code
+- ❌ Does NOT explore autonomously
+- ✅ ONLY analyzes structure and creates page layout
+
+**Output Format**:
+```python
+[
+    {
+        'page': 'Home',
+        'files': ['README.md'],
+        'description': 'Project overview'
+    },
+    {
+        'page': 'Architecture',
+        'files': ['src/**/*.py', 'core/*.py'],
+        'description': 'System architecture and design'
+    },
+    ...
+]
+```
+
+**LLM Prompt Pattern**:
+```
+System: You are a documentation planner. Create page structure ONLY.
+User: Repository structure: {directories, file types, ...}
+      Create a wiki page structure. Return JSON.
+```
+
+**Fallback**: If LLM fails, uses rule-based plan (Home, Architecture, API Reference)
+
+---
+
+### 6. Page Generator (`api/pipeline/generate.py`)
+
+**Purpose**: Generate wiki pages using LLM with RAG
+
+**Class**: `PageGenerator`
+
+**Key Methods**:
+```python
+def __init__(llm_client, embedder_client, max_context_tokens=6000)
+def prepare_embeddings(chunks: List[Dict])
+def generate_page(page_plan: Dict, files: List[Dict]) -> str
+```
+
+**Features**:
+- **RAG-based context**: Retrieve relevant chunks using cosine similarity
+- **File matching**: Match files based on glob patterns from plan
+- **Token budget**: Maximum 6000 tokens context (~24,000 chars)
+- **Per-page isolation**: Page errors don't crash pipeline
+
+**Generation Flow**:
+```
+1. Match files based on page plan patterns
+2. Embed page description as query
+3. Retrieve top-k relevant chunks (k=10)
+4. Build context: matched files + retrieved chunks
+5. Truncate context to token budget
+6. Call LLM to generate markdown content
+7. Return generated page or error page
+```
+
+**Context Structure**:
+```
+=== Relevant Files ===
+--- src/app.py ---
+<file content truncated to 2000 chars>
+
+=== Retrieved Context ===
+[src/core/engine.py#chunk3]
+<chunk content truncated to 1000 chars>
+```
+
+**Retrieval Algorithm**:
+```python
+# Cosine similarity
+query_embedding = embedder.embed([query])[0]
+similarities = chunk_embeddings @ query_embedding
+top_k_indices = argsort(similarities)[-10:]
+```
+
+---
+
+### 7. Wiki Writer (`api/wiki/writer.py`)
+
+**Purpose**: Write markdown files to disk
+
+**Class**: `WikiWriter`
+
+**Key Methods**:
+```python
+def __init__(output_dir: str, dry_run: bool = False)
+def write_wiki(pages: List[Dict[str, str]])
+```
+
+**Features**:
+- Individual .md files per page
+- Auto-generated `_Sidebar.md` for navigation
+- Filename sanitization (spaces → hyphens)
+- Dry-run mode (prints instead of writing)
+
+**Output Format**:
+```
+wiki_output/
+├── Home.md
+├── Architecture.md
+├── API-Reference.md
+└── _Sidebar.md
+```
+
+**Sidebar Format**:
+```markdown
+# Wiki Navigation
+
+* [Home](Home)
+* [Architecture](Architecture)
+* [API Reference](API-Reference)
+```
+
+---
+
+### 8. Main Entry Point (`deepwiki_single.py`)
+
+**Purpose**: CLI interface for pipeline execution
+
+**Usage**:
+```bash
+python deepwiki_single.py \
+  --repo https://github.com/org/repo \
+  --output ./wiki \
+  --token GITHUB_TOKEN \
+  --dry-run \
+  --debug
+```
+
+**Execution Flow**:
+```python
+[1/7] Initialize clients (LLM + Embedder)
+[2/7] Ingest repository (clone + load files)
+[3/7] Chunk files (split into segments)
+[4/7] Plan wiki structure (LLM decides pages)
+[5/7] Compute embeddings (BGE-M3, 1024-dim)
+[6/7] Generate pages (page-by-page with RAG)
+[7/7] Write wiki files (markdown + sidebar)
+```
+
+**Options**:
+- `--repo`: GitHub repository URL (required)
+- `--output`: Output directory (default: ./wiki_output)
+- `--token`: GitHub access token for private repos
+- `--workspace`: Workspace for cloning (default: ./workspace)
+- `--dry-run`: Test mode, don't write files
+- `--debug`: Enable debug logging
+
+---
+
+## 💻 Installation
+
+### Prerequisites
+
+- **Python 3.11+**
+- **Git** (for cloning repositories)
+- **Access to enterprise APIs**:
+  - gpt-oss-130b LLM endpoint
+  - BGE-M3 embedding endpoint
+
+### Dependencies
+
+Only 2 core dependencies:
+
+```txt
+httpx>=0.24.0    # HTTP client for API calls
+numpy>=1.24.0    # Vector operations for retrieval
+```
+
+### Setup
 
 ```bash
-# Clone the repository
-git clone https://github.com/AsyncFuncAI/deepwiki-open.git
+# Clone repository
+git clone https://github.com/CrossGrace/deepwiki-open.git
 cd deepwiki-open
 
-# Create a .env file with your API keys
-echo "GOOGLE_API_KEY=your_google_api_key" > .env
-echo "OPENAI_API_KEY=your_openai_api_key" >> .env
-# Optional: Use Google AI embeddings instead of OpenAI (recommended if using Google models)
-echo "DEEPWIKI_EMBEDDER_TYPE=google" >> .env
-# Optional: Add OpenRouter API key if you want to use OpenRouter models
-echo "OPENROUTER_API_KEY=your_openrouter_api_key" >> .env
-# Optional: Add Ollama host if not local. defaults to http://localhost:11434
-echo "OLLAMA_HOST=your_ollama_host" >> .env
-# Optional: Add Azure API key, endpoint and version if you want to use azure openai models
-echo "AZURE_OPENAI_API_KEY=your_azure_openai_api_key" >> .env
-echo "AZURE_OPENAI_ENDPOINT=your_azure_openai_endpoint" >> .env
-echo "AZURE_OPENAI_VERSION=your_azure_openai_version" >> .env
-# Run with Docker Compose
-docker-compose up
+# Install dependencies
+pip install -r requirements_single.txt
+
+# Or install manually
+pip install httpx numpy
 ```
 
-For detailed instructions on using DeepWiki with Ollama and Docker, see [Ollama Instructions](Ollama-instruction.md).
+---
 
-> 💡 **Where to get these keys:**
-> - Get a Google API key from [Google AI Studio](https://makersuite.google.com/app/apikey)
-> - Get an OpenAI API key from [OpenAI Platform](https://platform.openai.com/api-keys)
-> - Get Azure OpenAI credentials from [Azure Portal](https://portal.azure.com/) - create an Azure OpenAI resource and get the API key, endpoint, and API version
+## 🚀 Usage
 
-### Option 2: Manual Setup (Recommended)
-
-#### Step 1: Set Up Your API Keys
-
-Create a `.env` file in the project root with these keys:
-
-```
-GOOGLE_API_KEY=your_google_api_key
-OPENAI_API_KEY=your_openai_api_key
-# Optional: Use Google AI embeddings (recommended if using Google models)
-DEEPWIKI_EMBEDDER_TYPE=google
-# Optional: Add this if you want to use OpenRouter models
-OPENROUTER_API_KEY=your_openrouter_api_key
-# Optional: Add this if you want to use Azure OpenAI models
-AZURE_OPENAI_API_KEY=your_azure_openai_api_key
-AZURE_OPENAI_ENDPOINT=your_azure_openai_endpoint
-AZURE_OPENAI_VERSION=your_azure_openai_version
-# Optional: Add Ollama host if not local. default: http://localhost:11434
-OLLAMA_HOST=your_ollama_host
-```
-
-#### Step 2: Start the Backend
+### 1. Set Environment Variables
 
 ```bash
-# Install Python dependencies
-python -m pip install poetry==2.0.1 && poetry install -C api
+# LLM API (gpt-oss-130b)
+export DEEPWIKI_LLM_BASE_URL="https://your-llm-api.company.com"
+export DEEPWIKI_LLM_TOKEN="your-llm-auth-token"
 
-# Start the API server
-python -m api.main
+# Embedding API (BGE-M3)
+export DEEPWIKI_EMBEDDING_BASE_URL="https://your-embedding-api.company.com"
+export DEEPWIKI_EMBEDDING_TOKEN="your-embedding-auth-token"
 ```
 
-#### Step 3: Start the Frontend
+### 2. Run DeepWiki
+
+**Basic Usage**:
+```bash
+python deepwiki_single.py \
+  --repo https://github.com/your-org/your-repo \
+  --output ./wiki
+```
+
+**With GitHub Token** (for private repos):
+```bash
+python deepwiki_single.py \
+  --repo https://github.com/your-org/private-repo \
+  --output ./wiki \
+  --token YOUR_GITHUB_TOKEN
+```
+
+**Dry Run** (test without writing):
+```bash
+python deepwiki_single.py \
+  --repo https://github.com/anthropics/anthropic-sdk-python \
+  --dry-run \
+  --debug
+```
+
+### 3. View Output
 
 ```bash
-# Install JavaScript dependencies
-npm install
-# or
-yarn install
-
-# Start the web app
-npm run dev
-# or
-yarn dev
+ls -lh wiki_output/
+cat wiki_output/Home.md
+cat wiki_output/_Sidebar.md
 ```
 
-#### Step 4: Use DeepWiki!
+---
 
-1. Open [http://localhost:3000](http://localhost:3000) in your browser
-2. Enter a GitHub, GitLab, or Bitbucket repository (like `https://github.com/openai/codex`, `https://github.com/microsoft/autogen`, `https://gitlab.com/gitlab-org/gitlab`, or `https://bitbucket.org/redradish/atlassian_app_versions`)
-3. For private repositories, click "+ Add access tokens" and enter your GitHub or GitLab personal access token
-4. Click "Generate Wiki" and watch the magic happen!
+## 🔌 API Requirements
 
-## 🔍 How It Works
+### LLM API (gpt-oss-130b)
 
-DeepWiki uses AI to:
-
-1. Clone and analyze the GitHub, GitLab, or Bitbucket repository (including private repos with token authentication)
-2. Create embeddings of the code for smart retrieval
-3. Generate documentation with context-aware AI (using Google Gemini, OpenAI, OpenRouter, Azure OpenAI, or local Ollama models)
-4. Create visual diagrams to explain code relationships
-5. Organize everything into a structured wiki
-6. Enable intelligent Q&A with the repository through the Ask feature
-7. Provide in-depth research capabilities with DeepResearch
-
-```mermaid
-graph TD
-    A[User inputs GitHub/GitLab/Bitbucket repo] --> AA{Private repo?}
-    AA -->|Yes| AB[Add access token]
-    AA -->|No| B[Clone Repository]
-    AB --> B
-    B --> C[Analyze Code Structure]
-    C --> D[Create Code Embeddings]
-
-    D --> M{Select Model Provider}
-    M -->|Google Gemini| E1[Generate with Gemini]
-    M -->|OpenAI| E2[Generate with OpenAI]
-    M -->|OpenRouter| E3[Generate with OpenRouter]
-    M -->|Local Ollama| E4[Generate with Ollama]
-    M -->|Azure| E5[Generate with Azure]
-
-    E1 --> E[Generate Documentation]
-    E2 --> E
-    E3 --> E
-    E4 --> E
-    E5 --> E
-
-    D --> F[Create Visual Diagrams]
-    E --> G[Organize as Wiki]
-    F --> G
-    G --> H[Interactive DeepWiki]
-
-    classDef process stroke-width:2px;
-    classDef data stroke-width:2px;
-    classDef result stroke-width:2px;
-    classDef decision stroke-width:2px;
-
-    class A,D data;
-    class AA,M decision;
-    class B,C,E,F,G,AB,E1,E2,E3,E4,E5 process;
-    class H result;
+**Endpoint Pattern**:
+```
+POST /{model}/v1/chat/completions
 ```
 
-## 🛠️ Project Structure
-
+**Full URL Example**:
 ```
-deepwiki/
-├── api/                  # Backend API server
-│   ├── main.py           # API entry point
-│   ├── api.py            # FastAPI implementation
-│   ├── rag.py            # Retrieval Augmented Generation
-│   ├── data_pipeline.py  # Data processing utilities
-│   ├── pyproject.toml     # Python dependencies (Poetry)
-│   └── poetry.lock        # Locked Python dependency versions
-│
-├── src/                  # Frontend Next.js app
-│   ├── app/              # Next.js app directory
-│   │   └── page.tsx      # Main application page
-│   └── components/       # React components
-│       └── Mermaid.tsx   # Mermaid diagram renderer
-│
-├── public/               # Static assets
-├── package.json          # JavaScript dependencies
-└── .env                  # Environment variables (create this)
+https://your-llm-api.company.com/gpt-oss-130b/v1/chat/completions
 ```
 
-## 🤖 Provider-Based Model Selection System
-
-DeepWiki now implements a flexible provider-based model selection system supporting multiple LLM providers:
-
-### Supported Providers and Models
-
-- **Google**: Default `gemini-2.5-flash`, also supports `gemini-2.5-flash-lite`, `gemini-2.5-pro`, etc.
-- **OpenAI**: Default `gpt-5-nano`, also supports `gpt-5`, `4o`, etc.
-- **OpenRouter**: Access to multiple models via a unified API, including Claude, Llama, Mistral, etc.
-- **Azure OpenAI**: Default `gpt-4o`, also supports `o4-mini`, etc.
-- **Ollama**: Support for locally running open-source models like `llama3`
-
-### Environment Variables
-
-Each provider requires its corresponding API key environment variables:
-
-```
-# API Keys
-GOOGLE_API_KEY=your_google_api_key        # Required for Google Gemini models
-OPENAI_API_KEY=your_openai_api_key        # Required for OpenAI models
-OPENROUTER_API_KEY=your_openrouter_api_key # Required for OpenRouter models
-AZURE_OPENAI_API_KEY=your_azure_openai_api_key  #Required for Azure OpenAI models
-AZURE_OPENAI_ENDPOINT=your_azure_openai_endpoint  #Required for Azure OpenAI models
-AZURE_OPENAI_VERSION=your_azure_openai_version  #Required for Azure OpenAI models
-
-# OpenAI API Base URL Configuration
-OPENAI_BASE_URL=https://custom-api-endpoint.com/v1  # Optional, for custom OpenAI API endpoints
-
-# Ollama host
-OLLAMA_HOST=your_ollama_host # Optional, if Ollama is not local. default: http://localhost:11434
-
-# Configuration Directory
-DEEPWIKI_CONFIG_DIR=/path/to/custom/config/dir  # Optional, for custom config file location
+**Request Headers**:
+```json
+{
+  "Content-Type": "application/json",
+  "Accept": "application/json",
+  "x-dep-ticket": "your-auth-token"
+}
 ```
 
-### Configuration Files
+**Request Body**:
+```json
+{
+  "model": "openai/gpt-oss-130b",
+  "messages": [
+    {"role": "system", "content": "You are a technical writer..."},
+    {"role": "user", "content": "Write documentation for..."}
+  ],
+  "temperature": 0.7,
+  "max_tokens": 4000
+}
+```
 
-DeepWiki uses JSON configuration files to manage various aspects of the system:
+**Response Format** (OpenAI-compatible):
+```json
+{
+  "choices": [
+    {
+      "message": {
+        "role": "assistant",
+        "content": "Generated documentation text..."
+      },
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 1000,
+    "completion_tokens": 500,
+    "total_tokens": 1500
+  }
+}
+```
 
-1. **`generator.json`**: Configuration for text generation models
-   - Defines available model providers (Google, OpenAI, OpenRouter, Azure, Ollama)
-   - Specifies default and available models for each provider
-   - Contains model-specific parameters like temperature and top_p
+---
 
-2. **`embedder.json`**: Configuration for embedding models and text processing
-   - Defines embedding models for vector storage
-   - Contains retriever configuration for RAG
-   - Specifies text splitter settings for document chunking
+### Embedding API (BGE-M3)
 
-3. **`repo.json`**: Configuration for repository handling
-   - Contains file filters to exclude certain files and directories
-   - Defines repository size limits and processing rules
+**Endpoint**:
+```
+POST /v1/embeddings
+```
 
-By default, these files are located in the `api/config/` directory. You can customize their location using the `DEEPWIKI_CONFIG_DIR` environment variable.
+**Full URL Example**:
+```
+https://your-embedding-api.company.com/v1/embeddings
+```
 
-### Custom Model Selection for Service Providers
+**Request Headers**:
+```json
+{
+  "Content-Type": "application/json",
+  "Accept": "application/json",
+  "x-dep-ticket": "your-auth-token"
+}
+```
 
-The custom model selection feature is specifically designed for service providers who need to:
+**Request Body**:
+```json
+{
+  "model": "bge-m3",
+  "input": [
+    "First text to embed",
+    "Second text to embed",
+    "..."
+  ]
+}
+```
 
-- You can offer multiple AI model choices to users within your organization
-- You can quickly adapt to the rapidly evolving LLM landscape without code changes
-- You can support specialized or fine-tuned models that aren't in the predefined list
+**Response Format**:
+```json
+{
+  "embeddings": [
+    [0.123, 0.456, ..., 0.789],  // 1024-dimensional vector
+    [0.234, 0.567, ..., 0.890]
+  ],
+  "model": "bge-m3"
+}
+```
 
-Service providers can implement their model offerings by selecting from the predefined options or entering custom model identifiers in the frontend interface.
+**Alternative Format** (OpenAI-compatible):
+```json
+{
+  "data": [
+    {
+      "embedding": [0.123, 0.456, ..., 0.789],
+      "index": 0
+    },
+    {
+      "embedding": [0.234, 0.567, ..., 0.890],
+      "index": 1
+    }
+  ]
+}
+```
 
-### Base URL Configuration for Enterprise Private Channels
+**Critical**: Embeddings MUST be **1024-dimensional** (BGE-M3 standard)
 
-The OpenAI Client's base_url configuration is designed primarily for enterprise users with private API channels. This feature:
+---
 
-- Enables connection to private or enterprise-specific API endpoints
-- Allows organizations to use their own self-hosted or custom-deployed LLM services
-- Supports integration with third-party OpenAI API-compatible services
+## 🔐 Environment Variables
 
-**Coming Soon**: In future updates, DeepWiki will support a mode where users need to provide their own API keys in requests. This will allow enterprise customers with private channels to use their existing API arrangements without sharing credentials with the DeepWiki deployment.
+### Required Variables
 
-## 🧩 Using OpenAI-Compatible Embedding Models (e.g., Alibaba Qwen)
+| Variable | Description | Example |
+|----------|-------------|---------|
+| `DEEPWIKI_LLM_BASE_URL` | Base URL for gpt-oss-130b API | `https://llm-api.company.com` |
+| `DEEPWIKI_LLM_TOKEN` | Authentication token for LLM API | `your-secret-token` |
+| `DEEPWIKI_EMBEDDING_BASE_URL` | Base URL for BGE-M3 API | `https://embed-api.company.com` |
+| `DEEPWIKI_EMBEDDING_TOKEN` | Authentication token for embedding API | `your-secret-token` |
 
-If you want to use embedding models compatible with the OpenAI API (such as Alibaba Qwen), follow these steps:
+### Optional Variables
 
-1. Replace the contents of `api/config/embedder.json` with those from `api/config/embedder_openai_compatible.json`.
-2. In your project root `.env` file, set the relevant environment variables, for example:
-   ```
-   OPENAI_API_KEY=your_api_key
-   OPENAI_BASE_URL=your_openai_compatible_endpoint
-   ```
-3. The program will automatically substitute placeholders in embedder.json with the values from your environment variables.
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `DEEPWIKI_WORKSPACE` | Directory for cloning repos | `./workspace` |
+| `DEEPWIKI_OUTPUT` | Default output directory | `./wiki_output` |
 
-This allows you to seamlessly switch to any OpenAI-compatible embedding service without code changes.
+### Setting Variables
 
-## 🧠 Using Google AI Embeddings
-
-DeepWiki now supports Google AI's latest embedding models as an alternative to OpenAI embeddings. This provides better integration when you're already using Google Gemini models for text generation.
-
-### Features
-
-- **Latest Model**: Uses Google's `text-embedding-004` model
-- **Same API Key**: Uses your existing `GOOGLE_API_KEY` (no additional setup required)
-- **Better Integration**: Optimized for use with Google Gemini text generation models
-- **Task-Specific**: Supports semantic similarity, retrieval, and classification tasks
-- **Batch Processing**: Efficient processing of multiple texts
-
-### How to Enable Google AI Embeddings
-
-**Option 1: Environment Variable (Recommended)**
-
-Set the embedder type in your `.env` file:
-
+**Linux/Mac**:
 ```bash
-# Your existing Google API key
-GOOGLE_API_KEY=your_google_api_key
-
-# Enable Google AI embeddings
-DEEPWIKI_EMBEDDER_TYPE=google
+export DEEPWIKI_LLM_BASE_URL="https://llm-api.company.com"
+export DEEPWIKI_LLM_TOKEN="your-token"
 ```
 
-**Option 2: Docker Environment**
+**Windows (PowerShell)**:
+```powershell
+$env:DEEPWIKI_LLM_BASE_URL="https://llm-api.company.com"
+$env:DEEPWIKI_LLM_TOKEN="your-token"
+```
 
+**Using .env file** (requires python-dotenv):
 ```bash
-docker run -p 8001:8001 -p 3000:3000 \
-  -e GOOGLE_API_KEY=your_google_api_key \
-  -e DEEPWIKI_EMBEDDER_TYPE=google \
-  -v ~/.adalflow:/root/.adalflow \
-  ghcr.io/asyncfuncai/deepwiki-open:latest
+# Create .env file
+cat > .env <<EOF
+DEEPWIKI_LLM_BASE_URL=https://llm-api.company.com
+DEEPWIKI_LLM_TOKEN=your-token
+DEEPWIKI_EMBEDDING_BASE_URL=https://embed-api.company.com
+DEEPWIKI_EMBEDDING_TOKEN=your-token
+EOF
+
+# Load in Python
+from dotenv import load_dotenv
+load_dotenv()
 ```
 
-**Option 3: Docker Compose**
+---
 
-Add to your `.env` file:
+## 🔍 Code Structure Deep Dive
 
+### Data Flow
+
+```python
+# 1. Repository Data
+{
+    'path': 'src/main.py',
+    'content': 'def main():\n    ...',
+    'size': 1234
+}
+
+# 2. Chunks
+{
+    'text': 'def main():\n    print("Hello")',
+    'file': 'src/main.py',
+    'chunk_id': 0,
+    'source': 'src/main.py#chunk0'
+}
+
+# 3. Embeddings
+[
+    [0.123, 0.456, ..., 0.789],  # 1024-dimensional vector
+    [0.234, 0.567, ..., 0.890],
+    ...
+]
+
+# 4. Page Plans
+{
+    'page': 'Architecture',
+    'files': ['src/**/*.py'],
+    'description': 'System architecture'
+}
+
+# 5. Generated Pages
+{
+    'name': 'Architecture',
+    'content': '# Architecture\n\n...'
+}
+```
+
+### Key Algorithms
+
+#### 1. Cosine Similarity Retrieval
+
+```python
+def retrieve_chunks(query: str, chunks: List[Dict], embeddings: np.ndarray, top_k: int = 10):
+    """Retrieve most relevant chunks using cosine similarity."""
+    # Embed query
+    query_embedding = embedder.embed([query])[0]
+    query_vec = np.array(query_embedding)
+
+    # Normalize vectors
+    query_norm = query_vec / (np.linalg.norm(query_vec) + 1e-10)
+    chunk_norms = embeddings / (np.linalg.norm(embeddings, axis=1, keepdims=True) + 1e-10)
+
+    # Compute similarities
+    similarities = chunk_norms @ query_norm
+
+    # Get top-k indices
+    top_indices = np.argsort(similarities)[-top_k:][::-1]
+
+    return [chunks[i] for i in top_indices]
+```
+
+#### 2. Token Budget Management
+
+```python
+def truncate_context(context: str, max_tokens: int = 6000) -> str:
+    """Truncate context to token budget (approximation)."""
+    # Rough approximation: 4 chars = 1 token
+    max_chars = max_tokens * 4
+
+    if len(context) <= max_chars:
+        return context
+
+    return context[:max_chars] + "\n\n... (truncated)"
+```
+
+#### 3. Exponential Backoff Retry
+
+```python
+def call_with_retry(func, max_retries: int = 3):
+    """Call function with exponential backoff."""
+    for attempt in range(max_retries):
+        try:
+            return func()
+        except (HTTPStatusError, TimeoutException) as e:
+            if attempt == max_retries - 1:
+                raise
+
+            wait = 2 ** attempt  # 2, 4, 8 seconds
+            time.sleep(wait)
+
+    raise RuntimeError(f"Failed after {max_retries} attempts")
+```
+
+### Class Relationships
+
+```
+deepwiki_single.py (main)
+    │
+    ├── GPTOSSClient (llm)
+    │   └── httpx.Client
+    │
+    ├── BGEM3Client (embedding)
+    │   └── httpx.Client
+    │
+    ├── RepositoryIngester (pipeline)
+    │   └── subprocess (git)
+    │
+    ├── TextChunker (pipeline)
+    │
+    ├── WikiPlanner (pipeline)
+    │   └── GPTOSSClient
+    │
+    ├── PageGenerator (pipeline)
+    │   ├── GPTOSSClient
+    │   ├── BGEM3Client
+    │   └── numpy (for retrieval)
+    │
+    └── WikiWriter (wiki)
+```
+
+### State Management
+
+```python
+# Global state in PageGenerator
+class PageGenerator:
+    def __init__(self, llm, embedder):
+        self.llm = llm
+        self.embedder = embedder
+        self._chunks = None           # Cached chunks
+        self._chunk_embeddings = None # Cached embeddings
+
+    def prepare_embeddings(self, chunks):
+        """Compute and cache embeddings once."""
+        self._chunks = chunks
+        texts = [c['text'] for c in chunks]
+        self._chunk_embeddings = self.embedder.embed(texts)
+
+    def generate_page(self, page_plan, files):
+        """Use cached embeddings for retrieval."""
+        relevant = self._retrieve_chunks(page_plan['description'])
+        ...
+```
+
+---
+
+## ⚠️ Error Handling
+
+### LLM Call Failures
+
+**Scenarios**:
+- HTTP 429 (rate limit)
+- HTTP 500-504 (server errors)
+- Timeout (> 30s)
+- Network errors
+
+**Handling**:
+```python
+# In GPTOSSClient.chat()
+for attempt in range(max_retries):
+    try:
+        response = client.post(endpoint, json=payload)
+        response.raise_for_status()
+        return response.json()
+    except HTTPStatusError as e:
+        if e.response.status_code in (429, 500, 502, 503, 504):
+            if attempt < max_retries - 1:
+                wait = 2 ** attempt
+                time.sleep(wait)
+                continue
+        raise
+```
+
+**Impact**: Page generation fails, but pipeline continues
+
+---
+
+### Embedding Failures
+
+**Scenarios**:
+- Batch too large (HTTP 413)
+- Bad request (HTTP 400)
+- Rate limit (HTTP 429)
+- Individual text errors
+
+**Handling**:
+```python
+# In BGEM3Client.embed()
+try:
+    # Try full batch
+    return self._embed_batch(texts)
+except HTTPStatusError as e:
+    if status in (400, 413) and len(texts) > 1:
+        # Retry individual texts
+        return self._embed_individual(texts)
+    raise
+```
+
+**Fallback**: Zero vectors inserted for failed texts
+
+**Impact**: Retrieval may be less accurate, but pipeline continues
+
+---
+
+### Page Generation Failures
+
+**Scenarios**:
+- No matched files
+- LLM error
+- Context too large
+- JSON parsing error
+
+**Handling**:
+```python
+# In PageGenerator.generate_page()
+try:
+    content = self._generate_content(page_plan, context)
+    return content
+except Exception as e:
+    logger.error(f"Failed to generate {page_name}: {e}")
+    return self._generate_error_page(page_plan, str(e))
+```
+
+**Impact**: Error page written, other pages unaffected
+
+---
+
+### Wiki Write Failures
+
+**Scenarios**:
+- Permission denied
+- Disk full
+- Invalid filename
+
+**Handling**:
+```python
+# In WikiWriter.write_wiki()
+for page in pages:
+    try:
+        self._write_page(page['name'], page['content'])
+    except IOError as e:
+        logger.error(f"Failed to write {page['name']}: {e}")
+        continue  # Skip page, continue with others
+```
+
+**Impact**: Failed pages skipped, successful pages written
+
+---
+
+## 🛠️ Extending the System
+
+### Adding New Pipeline Stage
+
+**Example**: Add code analysis stage
+
+```python
+# api/pipeline/analyze.py
+class CodeAnalyzer:
+    """Analyze code complexity, dependencies, etc."""
+
+    def analyze_files(self, files: List[Dict]) -> Dict[str, any]:
+        analysis = {
+            'total_files': len(files),
+            'languages': self._detect_languages(files),
+            'complexity': self._compute_complexity(files),
+        }
+        return analysis
+```
+
+**Integrate in main**:
+```python
+# In deepwiki_single.py
+from api.pipeline.analyze import CodeAnalyzer
+
+analyzer = CodeAnalyzer()
+analysis = analyzer.analyze_files(files)
+logger.info(f"Analysis: {analysis}")
+```
+
+---
+
+### Customizing Page Templates
+
+**Example**: Add custom markdown header
+
+```python
+# In PageGenerator._generate_content()
+system_prompt = """You are a technical documentation writer.
+
+Use this template:
+# {page_name}
+
+> **Category**: {category}
+> **Last Updated**: {date}
+
+## Overview
+...
+"""
+```
+
+---
+
+### Switching Retrieval Strategy
+
+**Example**: Use BM25 instead of cosine similarity
+
+```python
+# Install: pip install rank-bm25
+from rank_bm25 import BM25Okapi
+
+class PageGenerator:
+    def _build_bm25_index(self, chunks):
+        """Build BM25 index instead of embeddings."""
+        corpus = [c['text'].split() for c in chunks]
+        self.bm25 = BM25Okapi(corpus)
+
+    def _retrieve_chunks_bm25(self, query, top_k=10):
+        """Retrieve using BM25 instead of embeddings."""
+        tokenized_query = query.split()
+        scores = self.bm25.get_scores(tokenized_query)
+        top_indices = np.argsort(scores)[-top_k:][::-1]
+        return [self._chunks[i] for i in top_indices]
+```
+
+---
+
+### Adding Caching
+
+**Example**: Cache embeddings to disk
+
+```python
+import pickle
+from pathlib import Path
+
+class PageGenerator:
+    def prepare_embeddings(self, chunks, cache_dir='./cache'):
+        cache_file = Path(cache_dir) / 'embeddings.pkl'
+
+        if cache_file.exists():
+            logger.info("Loading embeddings from cache")
+            with open(cache_file, 'rb') as f:
+                cached = pickle.load(f)
+                self._chunks = cached['chunks']
+                self._chunk_embeddings = cached['embeddings']
+                return
+
+        # Compute embeddings
+        logger.info("Computing embeddings")
+        texts = [c['text'] for c in chunks]
+        embeddings = self.embedder.embed(texts)
+
+        # Save to cache
+        cache_dir = Path(cache_dir)
+        cache_dir.mkdir(exist_ok=True)
+        with open(cache_file, 'wb') as f:
+            pickle.dump({'chunks': chunks, 'embeddings': embeddings}, f)
+
+        self._chunks = chunks
+        self._chunk_embeddings = embeddings
+```
+
+---
+
+## 🐛 Troubleshooting
+
+### "DEEPWIKI_LLM_BASE_URL must be set"
+
+**Cause**: Environment variable not set
+
+**Solution**:
 ```bash
-GOOGLE_API_KEY=your_google_api_key
-DEEPWIKI_EMBEDDER_TYPE=google
+export DEEPWIKI_LLM_BASE_URL="https://your-api.company.com"
+export DEEPWIKI_LLM_TOKEN="your-token"
 ```
 
-Then run:
+---
 
+### "HTTP 401 Unauthorized"
+
+**Cause**: Invalid API token
+
+**Solution**:
+1. Check token validity
+2. Verify `x-dep-ticket` header is supported by API
+3. Test with curl:
 ```bash
-docker-compose up
+curl -H "x-dep-ticket: your-token" \
+     https://your-api.company.com/health
 ```
 
-### Available Embedder Types
+---
 
-| Type | Description | API Key Required | Notes |
-|------|-------------|------------------|-------|
-| `openai` | OpenAI embeddings (default) | `OPENAI_API_KEY` | Uses `text-embedding-3-small` model |
-| `google` | Google AI embeddings | `GOOGLE_API_KEY` | Uses `text-embedding-004` model |
-| `ollama` | Local Ollama embeddings | None | Requires local Ollama installation |
+### "Embedding dimension mismatch"
 
-### Why Use Google AI Embeddings?
+**Cause**: API returns vectors ≠ 1024 dimensions
 
-- **Consistency**: If you're using Google Gemini for text generation, using Google embeddings provides better semantic consistency
-- **Performance**: Google's latest embedding model offers excellent performance for retrieval tasks
-- **Cost**: Competitive pricing compared to OpenAI
-- **No Additional Setup**: Uses the same API key as your text generation models
+**Solution**:
+1. Verify BGE-M3 API configuration
+2. Check response format:
+```python
+embeddings = response.json()['embeddings']
+print(f"Dimension: {len(embeddings[0])}")  # Should be 1024
+```
 
-### Switching Between Embedders
+---
 
-You can easily switch between different embedding providers:
+### "No files matched for page"
 
+**Cause**: Glob patterns in plan don't match actual files
+
+**Solution**:
+1. Enable debug logging: `--debug`
+2. Check matched files in logs
+3. Adjust patterns in planner or use fallback plan
+
+---
+
+### "Page generation timeout"
+
+**Cause**: LLM response too slow
+
+**Solution**:
+1. Increase timeout:
+```python
+llm = GPTOSSClient(timeout=60.0)  # 60 seconds instead of 30
+```
+2. Reduce context size:
+```python
+generator = PageGenerator(max_context_tokens=4000)  # 4000 instead of 6000
+```
+
+---
+
+### "Repository clone failed"
+
+**Cause**: Invalid URL, network error, or authentication
+
+**Solution**:
+1. Verify repo URL is correct
+2. For private repos, provide GitHub token:
 ```bash
-# Use OpenAI embeddings (default)
-export DEEPWIKI_EMBEDDER_TYPE=openai
-
-# Use Google AI embeddings
-export DEEPWIKI_EMBEDDER_TYPE=google
-
-# Use local Ollama embeddings
-export DEEPWIKI_EMBEDDER_TYPE=ollama
+python deepwiki_single.py --repo URL --token GITHUB_TOKEN
 ```
-
-**Note**: When switching embedders, you may need to regenerate your repository embeddings as different models produce different vector spaces.
-
-### Logging
-
-DeepWiki uses Python's built-in `logging` module for diagnostic output. You can configure the verbosity and log file destination via environment variables:
-
-| Variable        | Description                                                        | Default                      |
-|-----------------|--------------------------------------------------------------------|------------------------------|
-| `LOG_LEVEL`     | Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL).             | INFO                         |
-| `LOG_FILE_PATH` | Path to the log file. If set, logs will be written to this file.   | `api/logs/application.log`   |
-
-To enable debug logging and direct logs to a custom file:
+3. Check network connectivity:
 ```bash
-export LOG_LEVEL=DEBUG
-export LOG_FILE_PATH=./debug.log
-python -m api.main
+git clone https://github.com/org/repo test_clone
 ```
-Or with Docker Compose:
+
+---
+
+## 🔄 Migration Guide
+
+### From Original DeepWiki-Open
+
+**Old** (multi-provider):
 ```bash
-LOG_LEVEL=DEBUG LOG_FILE_PATH=./debug.log docker-compose up
+# Complex configuration
+export DEEPWIKI_EMBEDDER_TYPE=enterprise_bge
+# Edit api/config/generator.json
+# Edit api/config/embedder.json
+
+python main.py --repo-url https://github.com/org/repo
 ```
 
-When running with Docker Compose, the container's `api/logs` directory is bind-mounted to `./api/logs` on your host (see the `volumes` section in `docker-compose.yml`), ensuring log files persist across restarts.
-
-Alternatively, you can store these settings in your `.env` file:
-
+**New** (single-provider):
 ```bash
-LOG_LEVEL=DEBUG
-LOG_FILE_PATH=./debug.log
-```
-Then simply run:
+# Simple environment variables
+export DEEPWIKI_LLM_BASE_URL="https://llm-api.company.com"
+export DEEPWIKI_LLM_TOKEN="your-token"
+export DEEPWIKI_EMBEDDING_BASE_URL="https://embed-api.company.com"
+export DEEPWIKI_EMBEDDING_TOKEN="your-token"
 
+python deepwiki_single.py --repo https://github.com/org/repo
+```
+
+---
+
+### Key Differences
+
+| Feature | Original | Single-Provider |
+|---------|----------|-----------------|
+| **Providers** | Multiple (Google, OpenAI, Ollama, etc.) | Single (gpt-oss-130b + BGE-M3) |
+| **Configuration** | JSON files | Environment variables only |
+| **Web UI** | Yes (FastAPI) | No (CLI only) |
+| **Agent Mode** | Autonomous exploration | Constrained planning |
+| **Code Size** | ~15,000 lines | ~1,500 lines |
+| **Dependencies** | 20+ packages | 2 packages (httpx, numpy) |
+| **Streaming** | Yes | No |
+| **Multi-language** | Yes | English only |
+
+---
+
+## 📚 Additional Resources
+
+### Documentation Files
+
+- **`README_SINGLE_PROVIDER.md`**: Comprehensive user guide
+- **`SINGLE_PROVIDER_MIGRATION.md`**: Detailed migration summary
+- **`DELETED_FILES_LIST.md`**: Cleanup instructions for unused files
+
+### Example Repositories
+
+Test with these public repos:
 ```bash
-docker-compose up
+# Small repo (~100 files)
+python deepwiki_single.py \
+  --repo https://github.com/anthropics/anthropic-sdk-python
+
+# Medium repo (~500 files)
+python deepwiki_single.py \
+  --repo https://github.com/fastapi/fastapi
+
+# Large repo (~1000+ files)
+python deepwiki_single.py \
+  --repo https://github.com/django/django
 ```
 
-**Logging Path Security Considerations:** In production environments, ensure the `api/logs` directory and any custom log file path are secured with appropriate filesystem permissions and access controls. The application enforces that `LOG_FILE_PATH` resides within the project's `api/logs` directory to prevent path traversal or unauthorized writes.
+---
 
-## 🛠️ Advanced Setup
+## 🙏 Credits
 
-### Environment Variables
+Based on [DeepWiki-Open](https://github.com/deepwiki-io/deepwiki-open)
 
-| Variable             | Description                                                  | Required | Note                                                                                                     |
-|----------------------|--------------------------------------------------------------|----------|----------------------------------------------------------------------------------------------------------|
-| `GOOGLE_API_KEY`     | Google Gemini API key for AI generation and embeddings      | No | Required for Google Gemini models and Google AI embeddings                                               
-| `OPENAI_API_KEY`     | OpenAI API key for embeddings and models                     | Conditional | Required if using OpenAI embeddings or models                                                            |
-| `OPENROUTER_API_KEY` | OpenRouter API key for alternative models                    | No | Required only if you want to use OpenRouter models                                                       |
-| `AWS_ACCESS_KEY_ID`  | AWS access key ID for Bedrock                                 | No | Required for Bedrock if not using instance/role-based credentials                                        |
-| `AWS_SECRET_ACCESS_KEY` | AWS secret access key for Bedrock                          | No | Required for Bedrock if not using instance/role-based credentials                                        |
-| `AWS_SESSION_TOKEN`  | AWS session token for Bedrock (STS)                            | No | Required when using temporary credentials                                                                |
-| `AWS_REGION`         | AWS region for Bedrock (default: `us-east-1`)                  | No | Used by Bedrock client                                                                                   |
-| `AWS_ROLE_ARN`       | AWS role ARN to assume for Bedrock                             | No | If set, the Bedrock client will call STS AssumeRole                                                     |
-| `AZURE_OPENAI_API_KEY` | Azure OpenAI API key                    | No | Required only if you want to use Azure OpenAI models                                                       |
-| `AZURE_OPENAI_ENDPOINT` | Azure OpenAI endpoint                    | No | Required only if you want to use Azure OpenAI models                                                       |
-| `AZURE_OPENAI_VERSION` | Azure OpenAI version                     | No | Required only if you want to use Azure OpenAI models                                                       |
-| `OLLAMA_HOST`        | Ollama Host (default: http://localhost:11434)                | No | Required only if you want to use external Ollama server                                                  |
-| `DEEPWIKI_EMBEDDER_TYPE` | Embedder type: `openai`, `google`, `ollama`, or `bedrock` (default: `openai`) | No | Controls which embedding provider to use                                                              |
-| `PORT`               | Port for the API server (default: 8001)                      | No | If you host API and frontend on the same machine, make sure change port of `SERVER_BASE_URL` accordingly |
-| `SERVER_BASE_URL`    | Base URL for the API server (default: http://localhost:8001) | No |
-| `DEEPWIKI_AUTH_MODE` | Set to `true` or `1` to enable authorization mode. | No | Defaults to `false`. If enabled, `DEEPWIKI_AUTH_CODE` is required. |
-| `DEEPWIKI_AUTH_CODE` | The secret code required for wiki generation when `DEEPWIKI_AUTH_MODE` is enabled. | No | Only used if `DEEPWIKI_AUTH_MODE` is `true` or `1`. |
+Simplified for single-provider enterprise use.
 
-**API Key Requirements:**
-- If using `DEEPWIKI_EMBEDDER_TYPE=openai` (default): `OPENAI_API_KEY` is required
-- If using `DEEPWIKI_EMBEDDER_TYPE=google`: `GOOGLE_API_KEY` is required  
-- If using `DEEPWIKI_EMBEDDER_TYPE=ollama`: No API key required (local processing)
-- If using `DEEPWIKI_EMBEDDER_TYPE=bedrock`: AWS credentials (or role-based credentials) are required
-
-Other API keys are only required when configuring and using models from the corresponding providers.
-
-## Authorization Mode
-
-DeepWiki can be configured to run in an authorization mode, where wiki generation requires a valid authorization code. This is useful if you want to control who can use the generation feature.
-Restricts frontend initiation and protects cache deletion, but doesn't fully prevent backend generation if API endpoints are hit directly.
-
-To enable authorization mode, set the following environment variables:
-
-- `DEEPWIKI_AUTH_MODE`: Set this to `true` or `1`. When enabled, the frontend will display an input field for the authorization code.
-- `DEEPWIKI_AUTH_CODE`: Set this to the desired secret code. Restricts frontend initiation and protects cache deletion, but doesn't fully prevent backend generation if API endpoints are hit directly.
-
-If `DEEPWIKI_AUTH_MODE` is not set or is set to `false` (or any other value than `true`/`1`), the authorization feature will be disabled, and no code will be required.
-
-### Docker Setup
-
-You can use Docker to run DeepWiki:
-
-#### Running the Container
-
-```bash
-# Pull the image from GitHub Container Registry
-docker pull ghcr.io/asyncfuncai/deepwiki-open:latest
-
-# Run the container with environment variables
-docker run -p 8001:8001 -p 3000:3000 \
-  -e GOOGLE_API_KEY=your_google_api_key \
-  -e OPENAI_API_KEY=your_openai_api_key \
-  -e OPENROUTER_API_KEY=your_openrouter_api_key \
-  -e OLLAMA_HOST=your_ollama_host \
-  -e AZURE_OPENAI_API_KEY=your_azure_openai_api_key \
-  -e AZURE_OPENAI_ENDPOINT=your_azure_openai_endpoint \
-  -e AZURE_OPENAI_VERSION=your_azure_openai_version \
-
-  -v ~/.adalflow:/root/.adalflow \
-  ghcr.io/asyncfuncai/deepwiki-open:latest
-```
-
-This command also mounts `~/.adalflow` on your host to `/root/.adalflow` in the container. This path is used to store:
-- Cloned repositories (`~/.adalflow/repos/`)
-- Their embeddings and indexes (`~/.adalflow/databases/`)
-- Cached generated wiki content (`~/.adalflow/wikicache/`)
-
-This ensures that your data persists even if the container is stopped or removed.
-
-Or use the provided `docker-compose.yml` file:
-
-```bash
-# Edit the .env file with your API keys first
-docker-compose up
-```
-
-(The `docker-compose.yml` file is pre-configured to mount `~/.adalflow` for data persistence, similar to the `docker run` command above.)
-
-#### Using a .env file with Docker
-
-You can also mount a .env file to the container:
-
-```bash
-# Create a .env file with your API keys
-echo "GOOGLE_API_KEY=your_google_api_key" > .env
-echo "OPENAI_API_KEY=your_openai_api_key" >> .env
-echo "OPENROUTER_API_KEY=your_openrouter_api_key" >> .env
-echo "AZURE_OPENAI_API_KEY=your_azure_openai_api_key" >> .env
-echo "AZURE_OPENAI_ENDPOINT=your_azure_openai_endpoint" >> .env
-echo "AZURE_OPENAI_VERSION=your_azure_openai_version"  >>.env
-echo "OLLAMA_HOST=your_ollama_host" >> .env
-
-# Run the container with the .env file mounted
-docker run -p 8001:8001 -p 3000:3000 \
-  -v $(pwd)/.env:/app/.env \
-  -v ~/.adalflow:/root/.adalflow \
-  ghcr.io/asyncfuncai/deepwiki-open:latest
-```
-
-This command also mounts `~/.adalflow` on your host to `/root/.adalflow` in the container. This path is used to store:
-- Cloned repositories (`~/.adalflow/repos/`)
-- Their embeddings and indexes (`~/.adalflow/databases/`)
-- Cached generated wiki content (`~/.adalflow/wikicache/`)
-
-This ensures that your data persists even if the container is stopped or removed.
-
-#### Building the Docker image locally
-
-If you want to build the Docker image locally:
-
-```bash
-# Clone the repository
-git clone https://github.com/AsyncFuncAI/deepwiki-open.git
-cd deepwiki-open
-
-# Build the Docker image
-docker build -t deepwiki-open .
-
-# Run the container
-docker run -p 8001:8001 -p 3000:3000 \
-  -e GOOGLE_API_KEY=your_google_api_key \
-  -e OPENAI_API_KEY=your_openai_api_key \
-  -e OPENROUTER_API_KEY=your_openrouter_api_key \
-  -e AZURE_OPENAI_API_KEY=your_azure_openai_api_key \
-  -e AZURE_OPENAI_ENDPOINT=your_azure_openai_endpoint \
-  -e AZURE_OPENAI_VERSION=your_azure_openai_version \
-  -e OLLAMA_HOST=your_ollama_host \
-  deepwiki-open
-```
-
-#### Using Self-Signed Certificates in Docker
-
-If you're in an environment that uses self-signed certificates, you can include them in the Docker build:
-
-1. Create a directory for your certificates (default is `certs` in your project root)
-2. Copy your `.crt` or `.pem` certificate files into this directory
-3. Build the Docker image:
-
-```bash
-# Build with default certificates directory (certs)
-docker build .
-
-# Or build with a custom certificates directory
-docker build --build-arg CUSTOM_CERT_DIR=my-custom-certs .
-```
-
-### API Server Details
-
-The API server provides:
-- Repository cloning and indexing
-- RAG (Retrieval Augmented Generation)
-- Streaming chat completions
-
-For more details, see the [API README](./api/README.md).
-
-## 🔌 OpenRouter Integration
-
-DeepWiki now supports [OpenRouter](https://openrouter.ai/) as a model provider, giving you access to hundreds of AI models through a single API:
-
-- **Multiple Model Options**: Access models from OpenAI, Anthropic, Google, Meta, Mistral, and more
-- **Simple Configuration**: Just add your OpenRouter API key and select the model you want to use
-- **Cost Efficiency**: Choose models that fit your budget and performance needs
-- **Easy Switching**: Toggle between different models without changing your code
-
-### How to Use OpenRouter with DeepWiki
-
-1. **Get an API Key**: Sign up at [OpenRouter](https://openrouter.ai/) and get your API key
-2. **Add to Environment**: Add `OPENROUTER_API_KEY=your_key` to your `.env` file
-3. **Enable in UI**: Check the "Use OpenRouter API" option on the homepage
-4. **Select Model**: Choose from popular models like GPT-4o, Claude 3.5 Sonnet, Gemini 2.0, and more
-
-OpenRouter is particularly useful if you want to:
-- Try different models without signing up for multiple services
-- Access models that might be restricted in your region
-- Compare performance across different model providers
-- Optimize for cost vs. performance based on your needs
-
-## 🤖 Ask & DeepResearch Features
-
-### Ask Feature
-
-The Ask feature allows you to chat with your repository using Retrieval Augmented Generation (RAG):
-
-- **Context-Aware Responses**: Get accurate answers based on the actual code in your repository
-- **RAG-Powered**: The system retrieves relevant code snippets to provide grounded responses
-- **Real-Time Streaming**: See responses as they're generated for a more interactive experience
-- **Conversation History**: The system maintains context between questions for more coherent interactions
-
-### DeepResearch Feature
-
-DeepResearch takes repository analysis to the next level with a multi-turn research process:
-
-- **In-Depth Investigation**: Thoroughly explores complex topics through multiple research iterations
-- **Structured Process**: Follows a clear research plan with updates and a comprehensive conclusion
-- **Automatic Continuation**: The AI automatically continues research until reaching a conclusion (up to 5 iterations)
-- **Research Stages**:
-  1. **Research Plan**: Outlines the approach and initial findings
-  2. **Research Updates**: Builds on previous iterations with new insights
-  3. **Final Conclusion**: Provides a comprehensive answer based on all iterations
-
-To use DeepResearch, simply toggle the "Deep Research" switch in the Ask interface before submitting your question.
-
-## Screenshots
-
-![DeepWiki Main Interface](screenshots/Interface.png)
-*The main interface of DeepWiki*
-
-![Private Repository Support](screenshots/privaterepo.png)
-*Access private repositories with personal access tokens*
-
-![DeepResearch Feature](screenshots/DeepResearch.png)
-*DeepResearch conducts multi-turn investigations for complex topics*
-
-### Demo Video
-
-[![DeepWiki Demo Video](https://img.youtube.com/vi/zGANs8US8B4/0.jpg)](https://youtu.be/zGANs8US8B4)
-
-*Watch DeepWiki in action!*
-
-## ❓ Troubleshooting
-
-### API Key Issues
-- **"Missing environment variables"**: Make sure your `.env` file is in the project root and contains the required API keys
-- **"API key not valid"**: Check that you've copied the full key correctly with no extra spaces
-- **"OpenRouter API error"**: Verify your OpenRouter API key is valid and has sufficient credits
-- **"Azure OpenAI API error"**: Verify your Azure OpenAI credentials (API key, endpoint, and version) are correct and the service is properly deployed
-
-### Connection Problems
-- **"Cannot connect to API server"**: Make sure the API server is running on port 8001
-- **"CORS error"**: The API is configured to allow all origins, but if you're having issues, try running both frontend and backend on the same machine
-
-### Generation Issues
-- **"Error generating wiki"**: For very large repositories, try a smaller one first
-- **"Invalid repository format"**: Make sure you're using a valid GitHub, GitLab or Bitbucket URL format
-- **"Could not fetch repository structure"**: For private repositories, ensure you've entered a valid personal access token with appropriate permissions
-- **"Diagram rendering error"**: The app will automatically try to fix broken diagrams
-
-### Common Solutions
-1. **Restart both servers**: Sometimes a simple restart fixes most issues
-2. **Check console logs**: Open browser developer tools to see any JavaScript errors
-3. **Check API logs**: Look at the terminal where the API is running for Python errors
-
-## 🤝 Contributing
-
-Contributions are welcome! Feel free to:
-- Open issues for bugs or feature requests
-- Submit pull requests to improve the code
-- Share your feedback and ideas
+---
 
 ## 📄 License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+MIT License (inherited from DeepWiki-Open)
 
-## ⭐ Star History
+---
 
-[![Star History Chart](https://api.star-history.com/svg?repos=AsyncFuncAI/deepwiki-open&type=Date)](https://star-history.com/#AsyncFuncAI/deepwiki-open&Date)
+## 📞 Support
+
+For issues or questions:
+1. Read this README thoroughly
+2. Check `README_SINGLE_PROVIDER.md` for usage details
+3. Enable `--debug` mode for detailed logs
+4. Review error messages and troubleshooting section
+5. Contact repository maintainers for API-specific issues
+
+---
+
+**Last Updated**: January 2026
+
+**Version**: 2.0 (Single-Provider Edition)
