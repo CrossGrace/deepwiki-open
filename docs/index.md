@@ -1,6 +1,10 @@
 ---
 layout: default
 title: Home
+description: Enterprise GitHub Wiki Generator with AI-Powered Documentation
+next_page:
+  title: Architecture
+  url: /architecture.html
 ---
 
 # DeepWiki Open

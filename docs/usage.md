@@ -1,6 +1,13 @@
 ---
 layout: default
 title: Usage Guide
+description: Detailed instructions for CLI and web interface usage
+prev_page:
+  title: Architecture
+  url: /architecture.html
+next_page:
+  title: API Reference
+  url: /api-reference.html
 ---
 
 # Usage Guide
@@ -645,4 +652,3 @@ If you encounter issues:
 3. Enable `--verbose` mode for detailed logs
 4. Check API endpoint health
 
-[← Back to Home](index.md) | [Next: API Reference →](api-reference.md)

@@ -1,6 +1,10 @@
 ---
 layout: default
 title: Deployment
+description: Docker, cloud platforms, and production deployment guides
+prev_page:
+  title: Configuration
+  url: /configuration.html
 ---
 
 # Deployment Guide
@@ -896,4 +900,3 @@ free -m
 - [ ] Team notified
 - [ ] Load testing completed (if applicable)
 
-[← Back to Home](index.md)

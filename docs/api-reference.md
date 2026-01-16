@@ -1,6 +1,13 @@
 ---
 layout: default
 title: API Reference
+description: Complete Python API and Enterprise endpoint documentation
+prev_page:
+  title: Usage Guide
+  url: /usage.html
+next_page:
+  title: Configuration
+  url: /configuration.html
 ---
 
 # API Reference
@@ -890,4 +897,3 @@ print(f"Most relevant: {documents[top_idx]}")
 print(f"Similarity: {scores[top_idx]:.4f}")
 ```
 
-[← Back to Home](index.md) | [Next: Configuration →](configuration.md)
