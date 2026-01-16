@@ -1,6 +1,13 @@
 ---
 layout: default
 title: Configuration
+description: Environment variables, LLM settings, and pipeline configuration
+prev_page:
+  title: API Reference
+  url: /api-reference.html
+next_page:
+  title: Deployment
+  url: /deployment.html
 ---
 
 # Configuration Guide
@@ -796,4 +803,3 @@ python deepwiki_single.py \
   --output ./wiki
 ```
 
-[← Back to Home](index.md) | [Next: Deployment →](deployment.md)

@@ -1,6 +1,13 @@
 ---
 layout: default
 title: Architecture
+description: System design, data flow, and pipeline architecture
+prev_page:
+  title: Home
+  url: /index.html
+next_page:
+  title: Usage Guide
+  url: /usage.html
 ---
 
 # Architecture
@@ -532,4 +539,3 @@ def embed_texts_with_fallback(texts):
 | **Markdown** | react-markdown | Rendering |
 | **Diagrams** | Mermaid | Visual documentation |
 
-[← Back to Home](index.md) | [Next: Usage Guide →](usage.md)
