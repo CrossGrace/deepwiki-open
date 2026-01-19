@@ -58,9 +58,18 @@ docs/
 ├── architecture.md          # Architecture documentation
 ├── usage.md                 # Usage guide
 ├── api-reference.md         # API documentation
-├── configuration.md         # Configuration guide
-└── deployment.md            # Deployment guide
+├── configuration.md         # Configuration guide (includes Docker env vars)
+└── deployment.md            # Deployment guide (includes comprehensive Docker setup)
 ```
+
+### Docker Documentation
+
+For Docker deployment, see:
+- **[DOCKER_SETUP.md](../DOCKER_SETUP.md)** - Complete Docker setup guide (English)
+- **[DOCKER_SETUP.kr.md](../DOCKER_SETUP.kr.md)** - 완전한 Docker 설정 가이드 (한글)
+- **[deployment.md](deployment.md)** - Includes Docker deployment section
+- **[configuration.md](configuration.md)** - Environment variables for Docker
+- **[.env.example](../.env.example)** - Environment variable template
 
 ## Features
 

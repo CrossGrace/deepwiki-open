@@ -27,14 +27,44 @@ next_page:
 
 ## Quick Start
 
-### Prerequisites
+Choose your preferred deployment method:
 
+### Option 1: Docker (Recommended)
+
+**Prerequisites**: Docker 20.10+ and Docker Compose 1.29+
+
+```bash
+# 1. Clone the repository
+git clone https://github.com/CrossGrace/deepwiki-open.git
+cd deepwiki-open
+
+# 2. Configure environment
+cp .env.example .env
+# Edit .env with your API credentials
+
+# 3a. Run full web application
+docker-compose up -d
+# Access at http://localhost:3000
+
+# OR 3b. Run CLI only (lightweight)
+docker-compose -f docker-compose.cli.yml run --rm deepwiki-cli \
+  --repo https://github.com/your-org/your-repo \
+  --output /app/output
+```
+
+**Complete Docker Guide**:
+- [English Docker Setup Guide](../DOCKER_SETUP.md)
+- [한글 Docker 설정 가이드](../DOCKER_SETUP.kr.md)
+
+### Option 2: Native Installation
+
+**Prerequisites**:
 - Python 3.11+
 - Node.js 18+
 - Git
 - Enterprise API access (gpt-oss-130b + BGE-M3)
 
-### Installation
+**Installation**:
 
 ```bash
 # Clone the repository
@@ -48,16 +78,21 @@ pip install -r requirements_single.txt
 yarn install
 ```
 
-### Configuration
+**Configuration**:
 
 Set up your environment variables:
 
 ```bash
-export GPT_OSS_API_BASE="https://your-company-api.com"
-export GPT_OSS_API_KEY="your-api-key"
+# LLM API (gpt-oss-130b)
+export DEEPWIKI_LLM_BASE_URL="https://your-llm-api.company.com"
+export DEEPWIKI_LLM_TOKEN="your-llm-auth-token"
+
+# Embedding API (BGE-M3)
+export DEEPWIKI_EMBEDDING_BASE_URL="https://your-embedding-api.company.com"
+export DEEPWIKI_EMBEDDING_TOKEN="your-embedding-auth-token"
 ```
 
-### Generate a Wiki
+**Generate a Wiki** (CLI):
 
 ```bash
 python deepwiki_single.py \
@@ -65,7 +100,7 @@ python deepwiki_single.py \
   --output ./output/wiki
 ```
 
-### Run the Web UI
+**Run the Web UI**:
 
 ```bash
 # Development mode
