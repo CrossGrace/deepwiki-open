@@ -1,0 +1,43 @@
+# Docker Compose for DeepWiki Single Provider CLI
+# Lightweight version for command-line usage only
+
+version: '3.8'
+
+services:
+  deepwiki-cli:
+    build:
+      context: .
+      dockerfile: Dockerfile.cli
+    container_name: deepwiki-cli
+    env_file:
+      - .env
+    environment:
+      # LLM API configuration (required)
+      - DEEPWIKI_LLM_BASE_URL=${DEEPWIKI_LLM_BASE_URL}
+      - DEEPWIKI_LLM_TOKEN=${DEEPWIKI_LLM_TOKEN}
+
+      # Embedding API configuration (required)
+      - DEEPWIKI_EMBEDDING_BASE_URL=${DEEPWIKI_EMBEDDING_BASE_URL}
+      - DEEPWIKI_EMBEDDING_TOKEN=${DEEPWIKI_EMBEDDING_TOKEN}
+
+      # Workspace and output directories
+      - DEEPWIKI_WORKSPACE=/app/workspace
+      - DEEPWIKI_OUTPUT=/app/output
+    volumes:
+      # Persist generated wiki outputs
+      - ./output:/app/output
+
+      # Persist workspace (cloned repositories)
+      - ./workspace:/app/workspace
+
+      # Persist log files
+      - ./logs:/app/logs
+    # Resource limits (lighter than full web app)
+    mem_limit: 2g
+    mem_reservation: 512m
+    networks:
+      - deepwiki-network
+
+networks:
+  deepwiki-network:
+    driver: bridge
