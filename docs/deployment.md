@@ -82,154 +82,470 @@ tail -f logs/deepwiki.log
 
 ## Docker Deployment
 
-### Basic Docker Setup
+DeepWiki-Open provides two Docker deployment options for different use cases.
 
-1. **Build image**:
+> **📚 Complete Docker Documentation**: See [DOCKER_SETUP.md](../DOCKER_SETUP.md) for comprehensive guide with troubleshooting and advanced configuration.
+
+### Quick Start
+
+**Prerequisites**:
+- Docker 20.10+
+- Docker Compose 1.29+
+- Access to GPT-OSS-130b and BGE-M3 APIs
+
+**Setup**:
+
+1. **Configure environment**:
    ```bash
-   docker build -t deepwiki-open:latest .
+   # Copy example environment file
+   cp .env.example .env
+
+   # Edit .env and add your API credentials
+   nano .env
    ```
 
-2. **Run container**:
+2. **Choose deployment option**:
+
+   **Option A: Full Web Application**
    ```bash
-   docker run -d \
-     --name deepwiki \
-     -p 3000:3000 \
-     -e GPT_OSS_API_BASE="https://api.company.com" \
-     -e GPT_OSS_API_KEY="your-api-key" \
-     -v $(pwd)/output:/app/output \
-     deepwiki-open:latest
+   docker-compose up -d
+   # Access at http://localhost:3000
    ```
 
-3. **View logs**:
+   **Option B: CLI Only**
    ```bash
-   docker logs -f deepwiki
+   docker-compose -f docker-compose.cli.yml run --rm deepwiki-cli \
+     --repo https://github.com/your-org/your-repo \
+     --output /app/output
    ```
 
-4. **Stop container**:
-   ```bash
-   docker stop deepwiki
-   docker rm deepwiki
-   ```
+### Deployment Options
 
-### Docker Compose
+#### Option 1: Full Web Application
 
-**Create `docker-compose.yml`**:
+**What's included**:
+- Next.js frontend (port 3000)
+- FastAPI backend (port 8001)
+- CLI tool (`deepwiki_single.py`)
 
-```yaml
-version: '3.8'
+**Resource requirements**:
+- RAM: 4-6 GB
+- CPU: 2+ cores
+- Disk: 10+ GB
 
-services:
-  deepwiki:
-    build: .
-    container_name: deepwiki-open
-    ports:
-      - "3000:3000"
-    environment:
-      - GPT_OSS_API_BASE=${GPT_OSS_API_BASE}
-      - GPT_OSS_API_KEY=${GPT_OSS_API_KEY}
-      - NODE_ENV=production
-    volumes:
-      - ./output:/app/output
-      - ./config:/app/config
-      - ./logs:/app/logs
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-```
+**Configuration**:
 
-**Run with Docker Compose**:
+The `docker-compose.yml` is pre-configured with:
+- Environment variable management
+- Persistent volumes for data, workspace, and logs
+- Health checks and auto-restart
+- Resource limits (configurable)
+- Network isolation
+
+**Commands**:
 
 ```bash
-# Start services
+# Start services in background
 docker-compose up -d
 
 # View logs
 docker-compose logs -f
 
+# View specific service logs
+docker-compose logs -f deepwiki
+
+# Check status
+docker-compose ps
+
 # Stop services
+docker-compose stop
+
+# Stop and remove containers
 docker-compose down
+
+# Stop and remove volumes (⚠️ deletes data)
+docker-compose down -v
+
+# Rebuild after code changes
+docker-compose build --no-cache
+docker-compose up -d
 ```
 
-### Multi-Container Setup
+**Access the application**:
+- Frontend: http://localhost:3000
+- Backend API: http://localhost:8001
+- API Docs: http://localhost:8001/docs
 
-**Separate frontend and backend**:
+#### Option 2: CLI Only (Lightweight)
+
+**What's included**:
+- Command-line tool only (`deepwiki_single.py`)
+- No web interface
+
+**Resource requirements**:
+- RAM: 1-2 GB
+- CPU: 1+ cores
+- Disk: 5+ GB
+
+**Use cases**:
+- Automated wiki generation
+- CI/CD pipelines
+- Scheduled tasks (cron jobs)
+- Batch processing
+
+**Configuration**:
+
+Uses `docker-compose.cli.yml` and `Dockerfile.cli` for minimal footprint.
+
+**Commands**:
+
+```bash
+# Build CLI image
+docker-compose -f docker-compose.cli.yml build
+
+# Generate wiki for public repo
+docker-compose -f docker-compose.cli.yml run --rm deepwiki-cli \
+  --repo https://github.com/anthropics/anthropic-sdk-python \
+  --output /app/output
+
+# Generate wiki for private repo
+docker-compose -f docker-compose.cli.yml run --rm deepwiki-cli \
+  --repo https://github.com/your-org/private-repo \
+  --token $GITHUB_TOKEN \
+  --output /app/output
+
+# Dry run (test without writing files)
+docker-compose -f docker-compose.cli.yml run --rm deepwiki-cli \
+  --repo https://github.com/your-org/your-repo \
+  --dry-run \
+  --debug
+
+# Access generated output
+ls -la ./output/
+cat ./output/Home.md
+```
+
+**Alternative: Direct Docker run**:
+
+```bash
+# Build image
+docker build -t deepwiki-cli -f Dockerfile.cli .
+
+# Run with environment variables
+docker run --rm \
+  -e DEEPWIKI_LLM_BASE_URL="https://your-llm-api.com" \
+  -e DEEPWIKI_LLM_TOKEN="your-token" \
+  -e DEEPWIKI_EMBEDDING_BASE_URL="https://your-embed-api.com" \
+  -e DEEPWIKI_EMBEDDING_TOKEN="your-token" \
+  -v $(pwd)/output:/app/output \
+  -v $(pwd)/workspace:/app/workspace \
+  deepwiki-cli \
+  --repo https://github.com/your-org/your-repo \
+  --output /app/output
+```
+
+### Environment Configuration
+
+**Required variables** (in `.env` file):
+
+```bash
+# LLM API (gpt-oss-130b)
+DEEPWIKI_LLM_BASE_URL=https://your-llm-api.company.com
+DEEPWIKI_LLM_TOKEN=your-llm-auth-token
+
+# Embedding API (BGE-M3)
+DEEPWIKI_EMBEDDING_BASE_URL=https://your-embedding-api.company.com
+DEEPWIKI_EMBEDDING_TOKEN=your-embedding-auth-token
+```
+
+**Optional variables**:
+
+```bash
+# Application settings
+PORT=8001
+NODE_ENV=production
+LOG_LEVEL=INFO
+DEEPWIKI_WORKSPACE=./workspace
+DEEPWIKI_OUTPUT=./wiki_output
+
+# GitHub token (for private repos)
+GITHUB_TOKEN=ghp_your_token_here
+
+# Docker resource limits
+DOCKER_MEMORY_LIMIT=6g
+DOCKER_MEMORY_RESERVATION=2g
+```
+
+See [.env.example](../.env.example) for complete template.
+
+### Volume Management
+
+**Persistent data locations**:
+
+```
+./output/          # Generated wiki files
+./workspace/       # Cloned repositories
+./api/logs/        # Application logs
+deepwiki-data      # Named volume for embeddings
+```
+
+**Access volumes**:
+
+```bash
+# From host
+ls -la ./output/
+tail -f ./api/logs/application.log
+
+# From container
+docker-compose exec deepwiki bash
+cd /app/output
+```
+
+**Backup volumes**:
+
+```bash
+# Backup generated wikis
+tar -czf wikis-backup-$(date +%Y%m%d).tar.gz ./output
+
+# Backup workspace
+tar -czf workspace-backup-$(date +%Y%m%d).tar.gz ./workspace
+```
+
+**Clean up volumes**:
+
+```bash
+# Remove all volumes (⚠️ deletes all data)
+docker-compose down -v
+
+# Remove specific volume
+docker volume rm deepwiki-open_deepwiki-data
+
+# Clean unused volumes
+docker volume prune
+```
+
+### Production Deployment with Docker
+
+**Best practices**:
+
+1. **Use environment files**:
+   ```bash
+   # Don't commit .env to version control
+   echo ".env" >> .gitignore
+
+   # Use secrets management in production
+   docker secret create deepwiki_llm_token /path/to/token
+   ```
+
+2. **Configure resource limits**:
+   ```yaml
+   # docker-compose.yml
+   services:
+     deepwiki:
+       mem_limit: 8g
+       mem_reservation: 4g
+       cpus: 2.0
+   ```
+
+3. **Enable health checks**:
+   ```bash
+   # Check health status
+   docker inspect deepwiki-open | grep Health
+
+   # Test health endpoint
+   curl http://localhost:8001/health
+   ```
+
+4. **Set up logging**:
+   ```yaml
+   # docker-compose.yml
+   services:
+     deepwiki:
+       logging:
+         driver: "json-file"
+         options:
+           max-size: "10m"
+           max-file: "3"
+   ```
+
+5. **Configure restart policy**:
+   ```yaml
+   services:
+     deepwiki:
+       restart: unless-stopped  # or always
+   ```
+
+**Docker Swarm deployment**:
+
+```bash
+# Initialize swarm
+docker swarm init
+
+# Deploy stack
+docker stack deploy -c docker-compose.yml deepwiki
+
+# Check services
+docker service ls
+docker service logs deepwiki_deepwiki
+
+# Scale service
+docker service scale deepwiki_deepwiki=3
+
+# Remove stack
+docker stack rm deepwiki
+```
+
+### Enterprise Docker Configuration
+
+**Custom certificates**:
+
+```bash
+# Create certificates directory
+mkdir -p certs
+
+# Copy CA certificates
+cp /path/to/company-ca.crt certs/
+
+# Uncomment volume mount in docker-compose.yml
+# volumes:
+#   - ./certs:/app/certs:ro
+
+# Set environment variable
+export CUSTOM_CERT_DIR=certs
+
+# Rebuild and restart
+docker-compose down
+docker-compose build
+docker-compose up -d
+```
+
+**Corporate proxy**:
 
 ```yaml
-version: '3.8'
-
+# docker-compose.yml
 services:
-  frontend:
-    build:
-      context: .
-      dockerfile: Dockerfile.frontend
-    ports:
-      - "3000:3000"
+  deepwiki:
     environment:
-      - NEXT_PUBLIC_API_URL=http://backend:8000
-    depends_on:
-      - backend
-
-  backend:
-    build:
-      context: .
-      dockerfile: Dockerfile.backend
-    ports:
-      - "8000:8000"
-    environment:
-      - GPT_OSS_API_BASE=${GPT_OSS_API_BASE}
-      - GPT_OSS_API_KEY=${GPT_OSS_API_KEY}
-    volumes:
-      - ./output:/app/output
+      - HTTP_PROXY=http://proxy.company.com:8080
+      - HTTPS_PROXY=http://proxy.company.com:8080
+      - NO_PROXY=localhost,127.0.0.1
 ```
 
-**Dockerfile.frontend**:
+**Private registry**:
 
-```dockerfile
-FROM node:18-alpine AS deps
-WORKDIR /app
-COPY package.json yarn.lock ./
-RUN yarn install --frozen-lockfile
+```bash
+# Build and tag
+docker build -t registry.company.com/deepwiki-open:latest .
 
-FROM node:18-alpine AS builder
-WORKDIR /app
-COPY --from=deps /app/node_modules ./node_modules
-COPY . .
-RUN yarn build
+# Login to registry
+docker login registry.company.com
 
-FROM node:18-alpine AS runner
-WORKDIR /app
-ENV NODE_ENV production
-COPY --from=builder /app/.next ./.next
-COPY --from=builder /app/public ./public
-COPY --from=builder /app/node_modules ./node_modules
-COPY package.json ./
-EXPOSE 3000
-CMD ["yarn", "start"]
+# Push image
+docker push registry.company.com/deepwiki-open:latest
+
+# Update docker-compose.yml
+# image: registry.company.com/deepwiki-open:latest
 ```
 
-**Dockerfile.backend**:
+### Troubleshooting Docker Deployment
 
-```dockerfile
-FROM python:3.11-slim
-WORKDIR /app
+**Container won't start**:
 
-# Install dependencies
-COPY requirements_single.txt ./
-RUN pip install --no-cache-dir -r requirements_single.txt
+```bash
+# Check logs
+docker-compose logs deepwiki
 
-# Copy source
-COPY api ./api
-COPY deepwiki_single.py ./
+# Common issues:
+# 1. Missing environment variables
+cat .env | grep DEEPWIKI
 
-# Expose port
-EXPOSE 8000
+# 2. Port conflicts
+sudo lsof -i :3000
+sudo lsof -i :8001
 
-# Run server
-CMD ["python", "-m", "uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# 3. Permission issues
+sudo chown -R $USER:$USER output/ workspace/ api/logs/
 ```
+
+**API authentication failures**:
+
+```bash
+# Test API connectivity
+curl -H "x-dep-ticket: your-token" \
+     https://your-llm-api.com/health
+
+# Verify environment variables are loaded
+docker-compose exec deepwiki env | grep DEEPWIKI
+```
+
+**Out of memory**:
+
+```bash
+# Increase memory limit in .env
+echo "DOCKER_MEMORY_LIMIT=8g" >> .env
+echo "DOCKER_MEMORY_RESERVATION=4g" >> .env
+
+# Restart
+docker-compose down
+docker-compose up -d
+
+# Monitor resource usage
+docker stats deepwiki-open
+```
+
+**Build failures**:
+
+```bash
+# Clean build cache
+docker-compose build --no-cache
+
+# Remove old images
+docker image prune -a
+
+# Check disk space
+docker system df
+docker system prune
+```
+
+### Automated Deployment Examples
+
+**Cron job for scheduled wiki generation**:
+
+```bash
+# Edit crontab
+crontab -e
+
+# Add daily wiki generation at 2 AM
+0 2 * * * cd /opt/deepwiki-open && docker-compose -f docker-compose.cli.yml run --rm deepwiki-cli --repo https://github.com/your-org/repo --output /app/output >> /var/log/deepwiki-cron.log 2>&1
+```
+
+**Batch processing script**:
+
+```bash
+#!/bin/bash
+# generate-wikis.sh
+
+REPOS=(
+  "https://github.com/org/repo1"
+  "https://github.com/org/repo2"
+  "https://github.com/org/repo3"
+)
+
+for repo in "${REPOS[@]}"; do
+  echo "Generating wiki for $repo..."
+  docker-compose -f docker-compose.cli.yml run --rm deepwiki-cli \
+    --repo "$repo" \
+    --output /app/output
+done
+```
+
+### Additional Resources
+
+- **Complete Docker Guide**: [DOCKER_SETUP.md](../DOCKER_SETUP.md) (English)
+- **Korean Docker Guide**: [DOCKER_SETUP.kr.md](../DOCKER_SETUP.kr.md) (한글)
+- **Environment Template**: [.env.example](../.env.example)
+- **Docker Compose Config**: [docker-compose.yml](../docker-compose.yml)
+- **CLI Docker Config**: [docker-compose.cli.yml](../docker-compose.cli.yml)
 
 ---
 

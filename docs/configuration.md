@@ -26,85 +26,265 @@ Complete guide to configuring DeepWiki Open for your enterprise environment.
 
 ## Environment Variables
 
-### Required Variables
+DeepWiki-Open uses environment variables for configuration. The easiest way to manage them is through the `.env` file.
 
-DeepWiki Open requires two environment variables to function:
+### Quick Setup
+
+**Step 1**: Copy the example environment file:
 
 ```bash
-# Enterprise API base URL
-export GPT_OSS_API_BASE="https://your-company-api.com"
-
-# API authentication key
-export GPT_OSS_API_KEY="your-api-key-here"
+cp .env.example .env
 ```
+
+**Step 2**: Edit `.env` with your API credentials:
+
+```bash
+nano .env  # or use your preferred editor
+```
+
+**Step 3**: Fill in the required variables (see below).
+
+See [.env.example](../.env.example) for complete template with all available options.
+
+### Required Variables
+
+**For Single-Provider Mode** (recommended):
+
+```bash
+# LLM API Configuration (gpt-oss-130b)
+DEEPWIKI_LLM_BASE_URL=https://your-llm-api.company.com
+DEEPWIKI_LLM_TOKEN=your-llm-auth-token
+
+# Embedding API Configuration (BGE-M3)
+DEEPWIKI_EMBEDDING_BASE_URL=https://your-embedding-api.company.com
+DEEPWIKI_EMBEDDING_TOKEN=your-embedding-auth-token
+```
+
+These four variables are **required** for DeepWiki to function. Without them, the application will not start.
 
 ### Optional Variables
 
+**Application Configuration**:
+
 ```bash
-# Enable verbose logging
-export DEEPWIKI_VERBOSE=true
+# Backend API port (default: 8001)
+PORT=8001
 
-# Custom temporary directory
-export DEEPWIKI_TEMP_DIR="/tmp/deepwiki"
+# Node environment (production or development)
+NODE_ENV=production
 
-# Maximum concurrent API requests
-export DEEPWIKI_MAX_CONCURRENT=5
+# Server base URL for API
+SERVER_BASE_URL=http://localhost:8001
 
-# Default output directory
-export DEEPWIKI_OUTPUT_DIR="./output/wiki"
+# Logging configuration
+LOG_LEVEL=INFO                    # DEBUG, INFO, WARNING, ERROR, CRITICAL
+LOG_FILE_PATH=api/logs/application.log
+
+# Workspace and output directories
+DEEPWIKI_WORKSPACE=./workspace    # Where repositories are cloned
+DEEPWIKI_OUTPUT=./wiki_output     # Default wiki output directory
 ```
 
+**GitHub Access** (for private repositories):
+
+```bash
+# GitHub personal access token (optional)
+# Generate at: https://github.com/settings/tokens
+# Required scopes: repo (for private repositories)
+GITHUB_TOKEN=ghp_your_github_token_here
+```
+
+**Multi-Provider Mode** (optional, for advanced usage):
+
+```bash
+# Only needed if using the full multi-provider version
+OPENAI_API_KEY=sk-...
+GOOGLE_API_KEY=...
+```
+
+**Docker Configuration**:
+
+```bash
+# Memory limits for Docker container
+DOCKER_MEMORY_LIMIT=6g              # Maximum memory
+DOCKER_MEMORY_RESERVATION=2g        # Reserved memory
+
+# Custom certificate directory (for enterprise)
+CUSTOM_CERT_DIR=certs
+```
+
+### Complete Environment Variable Reference
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `DEEPWIKI_LLM_BASE_URL` | **Yes** | - | Base URL for GPT-OSS-130b API |
+| `DEEPWIKI_LLM_TOKEN` | **Yes** | - | Authentication token for LLM API |
+| `DEEPWIKI_EMBEDDING_BASE_URL` | **Yes** | - | Base URL for BGE-M3 embedding API |
+| `DEEPWIKI_EMBEDDING_TOKEN` | **Yes** | - | Authentication token for embedding API |
+| `PORT` | No | `8001` | Backend API server port |
+| `NODE_ENV` | No | `production` | Node environment mode |
+| `SERVER_BASE_URL` | No | `http://localhost:8001` | API base URL for frontend |
+| `LOG_LEVEL` | No | `INFO` | Logging verbosity level |
+| `LOG_FILE_PATH` | No | `api/logs/application.log` | Log file location |
+| `DEEPWIKI_WORKSPACE` | No | `./workspace` | Repository clone directory |
+| `DEEPWIKI_OUTPUT` | No | `./wiki_output` | Default wiki output directory |
+| `GITHUB_TOKEN` | No | - | GitHub token for private repos |
+| `OPENAI_API_KEY` | No | - | OpenAI API key (multi-provider) |
+| `GOOGLE_API_KEY` | No | - | Google API key (multi-provider) |
+| `DOCKER_MEMORY_LIMIT` | No | `6g` | Docker container memory limit |
+| `DOCKER_MEMORY_RESERVATION` | No | `2g` | Docker memory reservation |
+| `CUSTOM_CERT_DIR` | No | `certs` | Custom certificate directory |
+
 ### Setting Variables
+
+**Method 1: Using .env File (Recommended)**
+
+Create `.env` in project root:
+
+```bash
+# Copy example file
+cp .env.example .env
+
+# Edit with your values
+DEEPWIKI_LLM_BASE_URL=https://your-llm-api.company.com
+DEEPWIKI_LLM_TOKEN=your-llm-auth-token
+DEEPWIKI_EMBEDDING_BASE_URL=https://your-embedding-api.company.com
+DEEPWIKI_EMBEDDING_TOKEN=your-embedding-auth-token
+GITHUB_TOKEN=ghp_your_github_token_here
+```
+
+The `.env` file is automatically loaded by:
+- Docker Compose (`docker-compose up`)
+- Python scripts (if using `python-dotenv`)
+- Node.js application
+
+**Method 2: Export in Shell**
 
 **Linux/macOS**:
 
 ```bash
 # Temporary (current session)
-export GPT_OSS_API_BASE="https://api.company.com"
-export GPT_OSS_API_KEY="abc123xyz"
+export DEEPWIKI_LLM_BASE_URL="https://your-llm-api.company.com"
+export DEEPWIKI_LLM_TOKEN="your-llm-auth-token"
+export DEEPWIKI_EMBEDDING_BASE_URL="https://your-embedding-api.company.com"
+export DEEPWIKI_EMBEDDING_TOKEN="your-embedding-auth-token"
 
 # Permanent (add to ~/.bashrc or ~/.zshrc)
-echo 'export GPT_OSS_API_BASE="https://api.company.com"' >> ~/.bashrc
-echo 'export GPT_OSS_API_KEY="abc123xyz"' >> ~/.bashrc
+echo 'export DEEPWIKI_LLM_BASE_URL="https://your-llm-api.company.com"' >> ~/.bashrc
+echo 'export DEEPWIKI_LLM_TOKEN="your-llm-auth-token"' >> ~/.bashrc
 source ~/.bashrc
 ```
 
-**Windows**:
+**Windows PowerShell**:
 
 ```powershell
-# PowerShell
-$env:GPT_OSS_API_BASE = "https://api.company.com"
-$env:GPT_OSS_API_KEY = "abc123xyz"
+# Temporary (current session)
+$env:DEEPWIKI_LLM_BASE_URL = "https://your-llm-api.company.com"
+$env:DEEPWIKI_LLM_TOKEN = "your-llm-auth-token"
+$env:DEEPWIKI_EMBEDDING_BASE_URL = "https://your-embedding-api.company.com"
+$env:DEEPWIKI_EMBEDDING_TOKEN = "your-embedding-auth-token"
 
 # Permanent (System Properties > Environment Variables)
-setx GPT_OSS_API_BASE "https://api.company.com"
-setx GPT_OSS_API_KEY "abc123xyz"
+[System.Environment]::SetEnvironmentVariable('DEEPWIKI_LLM_BASE_URL', 'https://your-llm-api.company.com', 'User')
+[System.Environment]::SetEnvironmentVariable('DEEPWIKI_LLM_TOKEN', 'your-llm-auth-token', 'User')
 ```
 
-### Using .env File
-
-Create a `.env` file in the project root:
+**Method 3: Load from .env in Shell**
 
 ```bash
-# .env
-GPT_OSS_API_BASE=https://your-company-api.com
-GPT_OSS_API_KEY=your-api-key-here
-DEEPWIKI_VERBOSE=true
-DEEPWIKI_OUTPUT_DIR=./wiki-output
-```
-
-**Load with Python**:
-
-```python
-from dotenv import load_dotenv
-load_dotenv()
-```
-
-**Load in Shell**:
-
-```bash
+# Load all variables from .env
 export $(cat .env | xargs)
+
+# Or use with Docker
+docker run --env-file .env ...
 ```
+
+**Method 4: Docker Compose (Automatic)**
+
+Docker Compose automatically loads `.env` file:
+
+```bash
+# Just run docker-compose
+docker-compose up -d
+
+# Variables from .env are automatically available
+```
+
+### Security Best Practices
+
+**1. Never commit `.env` file**:
+
+```bash
+# Add to .gitignore (already done)
+echo ".env" >> .gitignore
+
+# Only commit .env.example
+git add .env.example
+```
+
+**2. Use secrets management in production**:
+
+```bash
+# AWS Secrets Manager
+aws secretsmanager get-secret-value \
+  --secret-id deepwiki/llm-token \
+  --query SecretString \
+  --output text
+
+# Docker secrets (Swarm mode)
+echo "your-token" | docker secret create deepwiki_llm_token -
+
+# Kubernetes secrets
+kubectl create secret generic deepwiki-secrets \
+  --from-literal=llm-token=your-token \
+  --from-literal=embedding-token=your-token
+```
+
+**3. Rotate credentials regularly**:
+
+```bash
+# Update .env with new tokens
+nano .env
+
+# Restart services
+docker-compose restart
+```
+
+**4. Use different credentials per environment**:
+
+```bash
+# .env.development
+DEEPWIKI_LLM_BASE_URL=https://dev-llm-api.company.com
+
+# .env.staging
+DEEPWIKI_LLM_BASE_URL=https://staging-llm-api.company.com
+
+# .env.production
+DEEPWIKI_LLM_BASE_URL=https://prod-llm-api.company.com
+```
+
+### Verifying Configuration
+
+**Check if variables are set**:
+
+```bash
+# In shell
+echo $DEEPWIKI_LLM_BASE_URL
+echo $DEEPWIKI_LLM_TOKEN
+
+# In Docker container
+docker-compose exec deepwiki env | grep DEEPWIKI
+
+# Test API connectivity
+curl -H "x-dep-ticket: $DEEPWIKI_LLM_TOKEN" \
+     $DEEPWIKI_LLM_BASE_URL/health
+```
+
+**Common issues**:
+
+1. **Variables not loading**: Ensure `.env` exists and is in project root
+2. **Authentication failures**: Verify tokens are correct and not expired
+3. **Connection errors**: Check API URLs are accessible from your network
 
 ---
 
