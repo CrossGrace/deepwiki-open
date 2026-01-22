@@ -247,11 +247,13 @@ Context from repository:
 
 Generate the complete markdown content for this page."""
 
+        # Use HIGH reasoning effort for content generation (maximum quality)
         response = self.llm.chat_with_system(
             system=system_prompt,
             user=user_prompt,
             temperature=0.5,
             max_tokens=4000,
+            reasoning_effort="high",  # Maximum quality for documentation content
         )
 
         return response

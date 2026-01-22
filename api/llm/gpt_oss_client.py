@@ -61,6 +61,7 @@ class GPTOSSClient:
         messages: List[Dict[str, str]],
         temperature: float = 0.7,
         max_tokens: Optional[int] = None,
+        reasoning_effort: str = "medium",
     ) -> str:
         """Generate completion using gpt-oss-130b.
 
@@ -68,6 +69,7 @@ class GPTOSSClient:
             messages: OpenAI-compatible message list
             temperature: Sampling temperature
             max_tokens: Max tokens to generate
+            reasoning_effort: Reasoning effort level ("low", "medium", "high")
 
         Returns:
             Generated text content
@@ -80,6 +82,7 @@ class GPTOSSClient:
             "model": "openai/gpt-oss-130b",
             "messages": messages,
             "temperature": temperature,
+            "reasoning_effort": reasoning_effort,
         }
 
         if max_tokens:
@@ -126,6 +129,7 @@ class GPTOSSClient:
         user: str,
         temperature: float = 0.7,
         max_tokens: Optional[int] = None,
+        reasoning_effort: str = "medium",
     ) -> str:
         """Convenience method for system + user prompt.
 
@@ -134,6 +138,7 @@ class GPTOSSClient:
             user: User prompt
             temperature: Sampling temperature
             max_tokens: Max tokens
+            reasoning_effort: Reasoning effort level ("low", "medium", "high")
 
         Returns:
             Generated text
@@ -142,7 +147,7 @@ class GPTOSSClient:
             {"role": "system", "content": system},
             {"role": "user", "content": user},
         ]
-        return self.chat(messages, temperature, max_tokens)
+        return self.chat(messages, temperature, max_tokens, reasoning_effort)
 
     def __del__(self):
         """Cleanup HTTP client."""

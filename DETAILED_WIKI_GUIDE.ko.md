@@ -36,8 +36,9 @@
 - ⚠️ `chunk_size`를 1000 → 500으로 조정 (Embedding API의 8192 토큰 제한 준수)
 - ✅ 자동 truncate 기능 추가 (6000자 초과 시 자동 잘림)
 - ✅ 여전히 RAG, context tokens, file references를 통해 **상세한 문서 생성** 유지!
+- 🔥 **NEW**: `reasoning_effort="high"` 추가 - LLM의 추론 능력을 최대로 활용!
 
-**결과**: 기본 설정 대비 **약 2배 더 자세한** 문서 생성 (토큰 제한 준수하면서!)
+**결과**: 기본 설정 대비 **약 2배 더 자세하고 고품질** 문서 생성 (토큰 제한 준수하면서!)
 
 ---
 
@@ -108,18 +109,19 @@ python -c "import os; print('Embedding URL:', os.getenv('DEEPWIKI_EMBEDDING_BASE
 
 ### 현재 적용된 최적화 설정
 
-이 프로젝트는 이미 **상세 문서 생성 모드**로 설정되어 있습니다.
+이 프로젝트는 이미 **상세 고품질 문서 생성 모드**로 설정되어 있습니다.
 
 #### ✅ `deepwiki_single.py:94-96` - 청킹 설정
 
 ```python
-# Increased chunk_size and overlap for more detailed documentation
-chunker = TextChunker(chunk_size=1000, overlap=200)
+# Reduced chunk_size to fit within 8192 token limit for embedding API
+# 500 words ≈ 650-750 tokens, safe for 8192 token limit
+chunker = TextChunker(chunk_size=500, overlap=100)
 ```
 
 **효과**:
-- 코드 블록을 더 크게 분할하여 컨텍스트 유지
-- 청크 간 중복이 커져서 정보 손실 방지
+- 8192 토큰 제한 준수 (안전한 크기)
+- 청크 간 중복으로 컨텍스트 연결
 
 #### ✅ `deepwiki_single.py:109-113` - 컨텍스트 토큰 설정
 
@@ -171,6 +173,39 @@ for chunk in relevant_chunks:
 **효과**:
 - 각 코드 청크의 내용이 2배로 증가
 - 더 완전한 함수/클래스 정의 포함
+
+#### 🔥 `reasoning_effort="high"` - LLM 추론 능력 최대화 (NEW!)
+
+```python
+# api/pipeline/plan.py:168 - 위키 구조 계획
+response = self.llm.chat_with_system(
+    system=system_prompt,
+    user=user_prompt,
+    temperature=0.3,
+    max_tokens=2000,
+    reasoning_effort="high",  # 최고 품질 추론!
+)
+
+# api/pipeline/generate.py:255 - 문서 내용 생성
+response = self.llm.chat_with_system(
+    system=system_prompt,
+    user=user_prompt,
+    temperature=0.5,
+    max_tokens=4000,
+    reasoning_effort="high",  # 최고 품질 추론!
+)
+```
+
+**효과**:
+- 🔥 **LLM이 더 깊게 생각하고 추론**
+- 🔥 **더 정확하고 자세한 문서 생성**
+- 🔥 **더 나은 구조화와 설명**
+- ⚡ **온프레미스 모델이므로 비용 걱정 없음!**
+
+**Reasoning Effort 레벨**:
+- `"low"`: 빠른 응답, 간단한 작업
+- `"medium"`: 균형잡힌 품질/속도
+- `"high"`: **최고 품질, 깊은 추론** ← 현재 사용!
 
 ---
 
