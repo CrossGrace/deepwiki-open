@@ -91,7 +91,8 @@ def main():
 
         # Chunk files
         logger.info("\n[3/7] Chunking files...")
-        chunker = TextChunker(chunk_size=500, overlap=100)
+        # Increased chunk_size and overlap for more detailed documentation
+        chunker = TextChunker(chunk_size=1000, overlap=200)
         chunks = chunker.chunk_files(files)
         logger.info(f"✓ Created {len(chunks)} chunks")
 
@@ -106,10 +107,11 @@ def main():
 
         # Prepare embeddings
         logger.info("\n[5/7] Computing embeddings...")
+        # Increased max_context_tokens for more detailed documentation
         generator = PageGenerator(
             llm_client=llm,
             embedder_client=embedder,
-            max_context_tokens=6000,
+            max_context_tokens=10000,
         )
         generator.prepare_embeddings(chunks)
         logger.info("✓ Embeddings computed")
