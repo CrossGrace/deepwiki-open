@@ -62,6 +62,15 @@ DEEPWIKI_EMBEDDING_BASE_URL=https://your-internal-embedding-api.company.com
 DEEPWIKI_EMBEDDING_TOKEN=your-embedding-authentication-token
 
 # =============================================================================
+# OPTIONAL: Embedding API Rate Limit 설정
+# =============================================================================
+# 배치 크기 (기본값: 50, Rate Limit 발생 시 30 또는 20으로 줄이기)
+DEEPWIKI_EMBEDDING_BATCH_SIZE=50
+
+# 배치 간 대기 시간 (기본값: 1.0초, Rate Limit 발생 시 2.0 또는 3.0으로 늘리기)
+DEEPWIKI_EMBEDDING_BATCH_DELAY=1.0
+
+# =============================================================================
 # OPTIONAL: 출력 디렉토리 설정
 # =============================================================================
 DEEPWIKI_WORKSPACE=./workspace
@@ -506,6 +515,49 @@ git clone git@github.com:your-org/your-repo.wiki.git
 
 ---
 
+### 문제 6: Embedding API Rate Limit 초과 ⚠️
+
+**증상**:
+```
+HTTP 429: Rate limit exceeded
+Error: Too many requests
+```
+
+**원인**:
+- 짧은 시간 내 너무 많은 API 호출
+- 배치 크기가 너무 큼 (기본값: 50)
+- 배치 간 delay가 부족 (기본값: 1초)
+
+**해결 방법**:
+
+**옵션 1: 환경 변수로 설정 (권장)**
+
+`.env` 파일에 추가:
+```bash
+# Rate Limit이 약할 때
+DEEPWIKI_EMBEDDING_BATCH_SIZE=50
+DEEPWIKI_EMBEDDING_BATCH_DELAY=1.0
+
+# Rate Limit이 중간일 때
+DEEPWIKI_EMBEDDING_BATCH_SIZE=30
+DEEPWIKI_EMBEDDING_BATCH_DELAY=2.0
+
+# Rate Limit이 강할 때
+DEEPWIKI_EMBEDDING_BATCH_SIZE=20
+DEEPWIKI_EMBEDDING_BATCH_DELAY=3.0
+```
+
+**옵션 2: 자동 재시도 활용**
+
+코드가 이미 자동 재시도를 지원합니다:
+- 1차 실패 → 5초 대기 후 재시도
+- 2차 실패 → 10초 대기 후 재시도
+- 3차 실패 → 20초 대기 후 재시도
+
+**상세 가이드**: [RATE_LIMIT_GUIDE.ko.md](RATE_LIMIT_GUIDE.ko.md) 참조
+
+---
+
 ## 📚 추가 자료
 
 ### 관련 문서
@@ -513,6 +565,8 @@ git clone git@github.com:your-org/your-repo.wiki.git
 - [README.md](README.md) - 프로젝트 전체 문서
 - [README_SINGLE_PROVIDER.md](README_SINGLE_PROVIDER.md) - Single Provider 가이드
 - [DOCKER_SETUP.md](DOCKER_SETUP.md) - Docker 설치 가이드
+- [RATE_LIMIT_GUIDE.ko.md](RATE_LIMIT_GUIDE.ko.md) - **Rate Limit 해결 가이드** ⭐
+- [wiki/USAGE_EXAMPLES.md](wiki/USAGE_EXAMPLES.md) - 20개 실전 예제
 - [.env.example](.env.example) - 환경 변수 템플릿
 
 ### 명령줄 옵션 전체 목록
