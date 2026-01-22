@@ -140,27 +140,27 @@ class PageGenerator:
         # Use page description as query for retrieval
         query = page_plan['description']
 
-        # Retrieve relevant chunks
+        # Retrieve relevant chunks (increased for detailed documentation)
         if self._chunk_embeddings:
-            relevant_chunks = self._retrieve_chunks(query, top_k=10)
+            relevant_chunks = self._retrieve_chunks(query, top_k=20)
         else:
             relevant_chunks = []
 
         # Build context from matched files + retrieved chunks
         context_parts = []
 
-        # Add file summaries
+        # Add file summaries (increased limits for detailed documentation)
         context_parts.append("=== Relevant Files ===\n")
-        for file_data in matched_files[:10]:  # Limit to 10 files
+        for file_data in matched_files[:20]:  # Increased to 20 files
             path = file_data['path']
-            content = file_data['content'][:2000]  # Truncate long files
+            content = file_data['content'][:4000]  # Increased truncation limit
             context_parts.append(f"\n--- {path} ---\n{content}\n")
 
-        # Add retrieved chunks
+        # Add retrieved chunks (increased limit for detailed documentation)
         if relevant_chunks:
             context_parts.append("\n=== Retrieved Context ===\n")
             for chunk in relevant_chunks:
-                context_parts.append(f"\n[{chunk['source']}]\n{chunk['text'][:1000]}\n")
+                context_parts.append(f"\n[{chunk['source']}]\n{chunk['text'][:2000]}\n")
 
         full_context = ''.join(context_parts)
 
