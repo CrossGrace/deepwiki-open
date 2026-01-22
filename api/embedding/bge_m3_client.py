@@ -27,24 +27,27 @@ class BGEM3Client:
         self,
         base_url: Optional[str] = None,
         token: Optional[str] = None,
-        batch_size: int = 100,
+        batch_size: Optional[int] = None,  # Default: 50 (or from DEEPWIKI_EMBEDDING_BATCH_SIZE)
         timeout: float = 60.0,
         max_retries: int = 3,
+        batch_delay: Optional[float] = None,  # Default: 1.0s (or from DEEPWIKI_EMBEDDING_BATCH_DELAY)
     ):
         """Initialize BGE-M3 client.
 
         Args:
             base_url: API base URL (or from DEEPWIKI_EMBEDDING_BASE_URL)
             token: Auth token (or from DEEPWIKI_EMBEDDING_TOKEN)
-            batch_size: Max texts per batch
+            batch_size: Max texts per batch (or from DEEPWIKI_EMBEDDING_BATCH_SIZE, default: 50)
             timeout: Request timeout in seconds
             max_retries: Max retry attempts on failure
+            batch_delay: Delay between batches in seconds (or from DEEPWIKI_EMBEDDING_BATCH_DELAY, default: 1.0)
         """
         self.base_url = base_url or os.getenv("DEEPWIKI_EMBEDDING_BASE_URL")
         self.token = token or os.getenv("DEEPWIKI_EMBEDDING_TOKEN")
-        self.batch_size = batch_size
+        self.batch_size = batch_size if batch_size is not None else int(os.getenv("DEEPWIKI_EMBEDDING_BATCH_SIZE", "50"))
         self.timeout = timeout
         self.max_retries = max_retries
+        self.batch_delay = batch_delay if batch_delay is not None else float(os.getenv("DEEPWIKI_EMBEDDING_BATCH_DELAY", "1.0"))
 
         if not self.base_url:
             raise ValueError("DEEPWIKI_EMBEDDING_BASE_URL must be set")
@@ -59,7 +62,7 @@ class BGEM3Client:
             timeout=self.timeout,
         )
 
-        logger.info(f"BGEM3Client initialized with base_url={self.base_url}, batch_size={self.batch_size}")
+        logger.info(f"BGEM3Client initialized with base_url={self.base_url}, batch_size={self.batch_size}, batch_delay={self.batch_delay}s")
 
     def embed(self, texts: List[str]) -> List[List[float]]:
         """Generate embeddings for texts using BGE-M3.
@@ -79,12 +82,21 @@ class BGEM3Client:
 
         logger.info(f"Embedding {len(texts)} text(s)")
 
-        # Process in batches
+        # Process in batches with delay to avoid rate limits
         all_embeddings = []
+        num_batches = (len(texts) + self.batch_size - 1) // self.batch_size
         for i in range(0, len(texts), self.batch_size):
+            batch_num = i // self.batch_size + 1
             batch = texts[i:i + self.batch_size]
+            logger.info(f"Processing batch {batch_num}/{num_batches} ({len(batch)} texts)")
+
             batch_embeddings = self._embed_batch(batch)
             all_embeddings.extend(batch_embeddings)
+
+            # Add delay between batches to avoid rate limits (except for last batch)
+            if i + self.batch_size < len(texts):
+                logger.debug(f"Waiting {self.batch_delay}s before next batch...")
+                time.sleep(self.batch_delay)
 
         logger.info(f"Generated {len(all_embeddings)} embedding(s)")
         return all_embeddings
@@ -133,8 +145,13 @@ class BGEM3Client:
 
                 # Retry on rate limit or server errors
                 if status in (429, 500, 502, 503, 504) and attempt < self.max_retries - 1:
-                    wait = 2 ** attempt
-                    logger.warning(f"Retrying in {wait}s...")
+                    # Longer wait for rate limit errors
+                    if status == 429:
+                        wait = 5 * (2 ** attempt)  # 5s, 10s, 20s for rate limits
+                        logger.warning(f"Rate limit exceeded, waiting {wait}s before retry...")
+                    else:
+                        wait = 2 ** attempt  # 2s, 4s, 8s for server errors
+                        logger.warning(f"Server error, retrying in {wait}s...")
                     time.sleep(wait)
                     continue
                 raise
