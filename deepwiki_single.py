@@ -91,8 +91,9 @@ def main():
 
         # Chunk files
         logger.info("\n[3/7] Chunking files...")
-        # Increased chunk_size and overlap for more detailed documentation
-        chunker = TextChunker(chunk_size=1000, overlap=200)
+        # Reduced chunk_size to fit within 8192 token limit for embedding API
+        # 500 words ≈ 650-750 tokens, safe for 8192 token limit
+        chunker = TextChunker(chunk_size=500, overlap=100)
         chunks = chunker.chunk_files(files)
         logger.info(f"✓ Created {len(chunks)} chunks")
 

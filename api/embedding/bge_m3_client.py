@@ -31,6 +31,7 @@ class BGEM3Client:
         timeout: float = 60.0,
         max_retries: int = 3,
         batch_delay: Optional[float] = None,  # Default: 1.0s (or from DEEPWIKI_EMBEDDING_BATCH_DELAY)
+        max_chars_per_text: int = 6000,  # Max chars per text (≈8000 tokens for safety)
     ):
         """Initialize BGE-M3 client.
 
@@ -41,6 +42,7 @@ class BGEM3Client:
             timeout: Request timeout in seconds
             max_retries: Max retry attempts on failure
             batch_delay: Delay between batches in seconds (or from DEEPWIKI_EMBEDDING_BATCH_DELAY, default: 1.0)
+            max_chars_per_text: Max characters per text (default: 6000 ≈ 8000 tokens)
         """
         self.base_url = base_url or os.getenv("DEEPWIKI_EMBEDDING_BASE_URL")
         self.token = token or os.getenv("DEEPWIKI_EMBEDDING_TOKEN")
@@ -48,6 +50,7 @@ class BGEM3Client:
         self.timeout = timeout
         self.max_retries = max_retries
         self.batch_delay = batch_delay if batch_delay is not None else float(os.getenv("DEEPWIKI_EMBEDDING_BATCH_DELAY", "1.0"))
+        self.max_chars_per_text = max_chars_per_text
 
         if not self.base_url:
             raise ValueError("DEEPWIKI_EMBEDDING_BASE_URL must be set")
@@ -82,19 +85,28 @@ class BGEM3Client:
 
         logger.info(f"Embedding {len(texts)} text(s)")
 
+        # Truncate texts to fit within token limit (8192 tokens ≈ 6000 chars)
+        truncated_texts = []
+        for text in texts:
+            if len(text) > self.max_chars_per_text:
+                logger.warning(f"Text exceeds {self.max_chars_per_text} chars, truncating from {len(text)} chars")
+                truncated_texts.append(text[:self.max_chars_per_text])
+            else:
+                truncated_texts.append(text)
+
         # Process in batches with delay to avoid rate limits
         all_embeddings = []
-        num_batches = (len(texts) + self.batch_size - 1) // self.batch_size
-        for i in range(0, len(texts), self.batch_size):
+        num_batches = (len(truncated_texts) + self.batch_size - 1) // self.batch_size
+        for i in range(0, len(truncated_texts), self.batch_size):
             batch_num = i // self.batch_size + 1
-            batch = texts[i:i + self.batch_size]
+            batch = truncated_texts[i:i + self.batch_size]
             logger.info(f"Processing batch {batch_num}/{num_batches} ({len(batch)} texts)")
 
             batch_embeddings = self._embed_batch(batch)
             all_embeddings.extend(batch_embeddings)
 
             # Add delay between batches to avoid rate limits (except for last batch)
-            if i + self.batch_size < len(texts):
+            if i + self.batch_size < len(truncated_texts):
                 logger.debug(f"Waiting {self.batch_delay}s before next batch...")
                 time.sleep(self.batch_delay)
 
