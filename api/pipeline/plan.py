@@ -160,11 +160,13 @@ Structure analysis:
 Create a wiki page structure. Return ONLY valid JSON, no markdown formatting."""
 
         try:
+            # Use HIGH reasoning effort for wiki structure planning (critical foundation)
             response = self.llm.chat_with_system(
                 system=system_prompt,
                 user=user_prompt,
                 temperature=0.3,
                 max_tokens=2000,
+                reasoning_effort="high",  # Maximum quality for structure planning
             )
 
             # Parse JSON response

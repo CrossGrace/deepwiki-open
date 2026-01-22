@@ -1,6 +1,85 @@
-# 🚨 Embedding API Rate Limit 해결 가이드
+# 🚨 Embedding API 문제 해결 가이드
 
-## 문제 증상
+## 목차
+
+1. [토큰 제한 초과 (8192 tokens)](#토큰-제한-초과-8192-tokens) ⚠️ NEW!
+2. [Rate Limit 초과 (429 에러)](#rate-limit-초과-429-에러)
+
+---
+
+## 토큰 제한 초과 (8192 tokens)
+
+### 문제 증상
+
+Embedding API 호출 시 다음과 같은 에러가 발생합니다:
+
+```
+HTTP 400: Text must be less than 8192 tokens
+Error: Token limit exceeded
+ValidationError: Input text too long
+```
+
+### 원인
+
+각 텍스트가 **8192 토큰 제한**을 초과하고 있습니다:
+
+- `chunk_size=1000` 단어 설정
+- 일부 파일이 매우 큰 경우 하나의 청크가 8192 토큰을 초과
+- 1000 단어 ≈ 1300-1500 토큰 (일반적으로)
+- 하지만 코드, 특수문자가 많으면 더 많은 토큰 사용
+
+### 해결 방법 ✅
+
+**이미 자동으로 해결되었습니다!**
+
+코드가 다음과 같이 수정되었습니다:
+
+#### 1. Chunk Size 감소
+```python
+# deepwiki_single.py:95
+chunk_size=500  # 기존: 1000 → 새: 500
+# 500 단어 ≈ 650-750 토큰 (안전!)
+```
+
+#### 2. 자동 Truncate
+```python
+# api/embedding/bge_m3_client.py
+max_chars_per_text=6000  # 6000 문자 ≈ 8000 토큰 (안전 마진)
+# 각 텍스트가 6000자를 초과하면 자동으로 잘림
+```
+
+### 로그 확인
+
+정상 작동 시:
+```
+INFO: Embedding 423 text(s)
+INFO: Processing batch 1/9 (50 texts)
+✓ Embeddings computed
+```
+
+텍스트가 잘릴 때 (경고 표시):
+```
+WARNING: Text exceeds 6000 chars, truncating from 8543 chars
+INFO: Embedding 423 text(s)
+INFO: Processing batch 1/9 (50 texts)
+✓ Embeddings computed
+```
+
+### 추가 조치 (필요시)
+
+여전히 에러가 발생하면:
+
+```bash
+# .env 파일에서 chunk_size를 더 줄이기 (직접 수정 필요)
+# deepwiki_single.py:95
+chunk_size=300  # 500 → 300으로 더 감소
+```
+
+---
+
+## Rate Limit 초과 (429 에러)
+
+### 문제 증상
 
 Embedding API 호출 시 다음과 같은 에러가 발생합니다:
 
@@ -9,9 +88,7 @@ HTTP 429: Rate limit exceeded
 Error: Too many requests
 ```
 
----
-
-## 🔍 원인
+### 원인
 
 ### 1. 짧은 시간 내 많은 API 호출
 - **Chunk 개수 증가**: `chunk_size=1000, overlap=200` 설정으로 더 많은 청크 생성

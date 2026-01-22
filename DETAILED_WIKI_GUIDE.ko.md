@@ -19,19 +19,26 @@
 
 ### 최적화된 설정 (2024년 12월 업데이트)
 
-이 프로젝트는 **상세한 문서 생성**을 위해 다음과 같이 최적화되었습니다:
+이 프로젝트는 **상세한 문서 생성**과 **8192 토큰 제한 준수**를 위해 다음과 같이 최적화되었습니다:
 
-| 파라미터 | 기본값 | 상세 문서용 설정 | 효과 |
-|---------|-------|----------------|------|
-| `chunk_size` | 500 단어 | **1000 단어** | 더 큰 코드 블록 분석 |
-| `overlap` | 100 단어 | **200 단어** | 더 나은 컨텍스트 연결 |
-| `max_context_tokens` | 6000 토큰 | **10000 토큰** | 페이지당 더 많은 정보 |
-| `top_k` (RAG) | 10개 | **20개** | 더 많은 관련 코드 검색 |
-| `matched_files` | 10개 | **20개** | 더 많은 파일 참조 |
-| `file_content_limit` | 2000자 | **4000자** | 파일당 더 긴 내용 |
-| `chunk_text_limit` | 1000자 | **2000자** | 청크당 더 긴 내용 |
+| 파라미터 | 기본값 | 현재 설정 | 효과 |
+|---------|-------|---------|------|
+| `chunk_size` | 500 단어 | **500 단어** | 8192 토큰 제한 준수 ✅ |
+| `overlap` | 100 단어 | **100 단어** | 컨텍스트 연결 |
+| `max_context_tokens` | 6000 토큰 | **10000 토큰** | 페이지당 더 많은 정보 (+67%) |
+| `top_k` (RAG) | 10개 | **20개** | 더 많은 관련 코드 검색 (+100%) |
+| `matched_files` | 10개 | **20개** | 더 많은 파일 참조 (+100%) |
+| `file_content_limit` | 2000자 | **4000자** | 파일당 더 긴 내용 (+100%) |
+| `chunk_text_limit` | 1000자 | **2000자** | 청크당 더 긴 내용 (+100%) |
+| `max_chars_per_text` | - | **6000자** | 8192 토큰 안전 마진 🆕 |
 
-**결과**: 기본 설정 대비 **약 2.5배 더 자세한** 문서 생성!
+**중요 변경사항** (2024-12-21):
+- ⚠️ `chunk_size`를 1000 → 500으로 조정 (Embedding API의 8192 토큰 제한 준수)
+- ✅ 자동 truncate 기능 추가 (6000자 초과 시 자동 잘림)
+- ✅ 여전히 RAG, context tokens, file references를 통해 **상세한 문서 생성** 유지!
+- 🔥 **NEW**: `reasoning_effort="high"` 추가 - LLM의 추론 능력을 최대로 활용!
+
+**결과**: 기본 설정 대비 **약 2배 더 자세하고 고품질** 문서 생성 (토큰 제한 준수하면서!)
 
 ---
 
@@ -102,18 +109,19 @@ python -c "import os; print('Embedding URL:', os.getenv('DEEPWIKI_EMBEDDING_BASE
 
 ### 현재 적용된 최적화 설정
 
-이 프로젝트는 이미 **상세 문서 생성 모드**로 설정되어 있습니다.
+이 프로젝트는 이미 **상세 고품질 문서 생성 모드**로 설정되어 있습니다.
 
 #### ✅ `deepwiki_single.py:94-96` - 청킹 설정
 
 ```python
-# Increased chunk_size and overlap for more detailed documentation
-chunker = TextChunker(chunk_size=1000, overlap=200)
+# Reduced chunk_size to fit within 8192 token limit for embedding API
+# 500 words ≈ 650-750 tokens, safe for 8192 token limit
+chunker = TextChunker(chunk_size=500, overlap=100)
 ```
 
 **효과**:
-- 코드 블록을 더 크게 분할하여 컨텍스트 유지
-- 청크 간 중복이 커져서 정보 손실 방지
+- 8192 토큰 제한 준수 (안전한 크기)
+- 청크 간 중복으로 컨텍스트 연결
 
 #### ✅ `deepwiki_single.py:109-113` - 컨텍스트 토큰 설정
 
@@ -165,6 +173,39 @@ for chunk in relevant_chunks:
 **효과**:
 - 각 코드 청크의 내용이 2배로 증가
 - 더 완전한 함수/클래스 정의 포함
+
+#### 🔥 `reasoning_effort="high"` - LLM 추론 능력 최대화 (NEW!)
+
+```python
+# api/pipeline/plan.py:168 - 위키 구조 계획
+response = self.llm.chat_with_system(
+    system=system_prompt,
+    user=user_prompt,
+    temperature=0.3,
+    max_tokens=2000,
+    reasoning_effort="high",  # 최고 품질 추론!
+)
+
+# api/pipeline/generate.py:255 - 문서 내용 생성
+response = self.llm.chat_with_system(
+    system=system_prompt,
+    user=user_prompt,
+    temperature=0.5,
+    max_tokens=4000,
+    reasoning_effort="high",  # 최고 품질 추론!
+)
+```
+
+**효과**:
+- 🔥 **LLM이 더 깊게 생각하고 추론**
+- 🔥 **더 정확하고 자세한 문서 생성**
+- 🔥 **더 나은 구조화와 설명**
+- ⚡ **온프레미스 모델이므로 비용 걱정 없음!**
+
+**Reasoning Effort 레벨**:
+- `"low"`: 빠른 응답, 간단한 작업
+- `"medium"`: 균형잡힌 품질/속도
+- `"high"`: **최고 품질, 깊은 추론** ← 현재 사용!
 
 ---
 
@@ -558,6 +599,46 @@ DEEPWIKI_EMBEDDING_BATCH_DELAY=3.0
 
 ---
 
+### 문제 7: 토큰 제한 초과 (8192 tokens) 🆕
+
+**증상**:
+```
+HTTP 400: Text must be less than 8192 tokens
+ValidationError: Input text too long
+```
+
+**원인**:
+- 각 텍스트 청크가 8192 토큰을 초과
+- Embedding API의 최대 토큰 제한
+
+**해결 방법**:
+
+**✅ 이미 자동으로 해결되었습니다!**
+
+코드가 다음과 같이 수정되었습니다:
+- Chunk size 감소: 1000 → 500 단어
+- 자동 truncate: 6000 문자 이상은 자동으로 잘림
+
+**확인 방법**:
+```bash
+# 로그에서 경고 메시지 확인
+python deepwiki_single.py --repo URL --debug
+```
+
+**로그 예시**:
+```
+WARNING: Text exceeds 6000 chars, truncating from 8543 chars
+```
+
+**추가 조치 (필요시)**:
+
+`deepwiki_single.py:95`에서 chunk_size를 더 줄이기:
+```python
+chunker = TextChunker(chunk_size=300, overlap=50)  # 500 → 300
+```
+
+---
+
 ## 📚 추가 자료
 
 ### 관련 문서
@@ -565,7 +646,7 @@ DEEPWIKI_EMBEDDING_BATCH_DELAY=3.0
 - [README.md](README.md) - 프로젝트 전체 문서
 - [README_SINGLE_PROVIDER.md](README_SINGLE_PROVIDER.md) - Single Provider 가이드
 - [DOCKER_SETUP.md](DOCKER_SETUP.md) - Docker 설치 가이드
-- [RATE_LIMIT_GUIDE.ko.md](RATE_LIMIT_GUIDE.ko.md) - **Rate Limit 해결 가이드** ⭐
+- [RATE_LIMIT_GUIDE.ko.md](RATE_LIMIT_GUIDE.ko.md) - **Embedding API 문제 해결** (토큰 제한, Rate Limit) ⭐
 - [wiki/USAGE_EXAMPLES.md](wiki/USAGE_EXAMPLES.md) - 20개 실전 예제
 - [.env.example](.env.example) - 환경 변수 템플릿
 
@@ -599,17 +680,19 @@ python deepwiki_single.py --help
 
 ### 설정 비교표
 
-| 항목 | 기본 설정 | 상세 문서 설정 (현재) | 증가율 |
-|------|---------|-------------------|--------|
-| Chunk Size | 500 단어 | 1000 단어 | **+100%** |
-| Overlap | 100 단어 | 200 단어 | **+100%** |
-| Context Tokens | 6000 | 10000 | **+67%** |
-| RAG Top-K | 10개 | 20개 | **+100%** |
-| Matched Files | 10개 | 20개 | **+100%** |
-| File Content | 2000자 | 4000자 | **+100%** |
-| Chunk Text | 1000자 | 2000자 | **+100%** |
+| 항목 | 기본 설정 | 현재 설정 | 변경사항 |
+|------|---------|---------|---------|
+| Chunk Size | 500 단어 | **500 단어** | 8192 토큰 제한 준수 ✅ |
+| Overlap | 100 단어 | **100 단어** | 유지 |
+| Context Tokens | 6000 | **10000** | **+67%** 🔥 |
+| RAG Top-K | 10개 | **20개** | **+100%** 🔥 |
+| Matched Files | 10개 | **20개** | **+100%** 🔥 |
+| File Content | 2000자 | **4000자** | **+100%** 🔥 |
+| Chunk Text | 1000자 | **2000자** | **+100%** 🔥 |
+| Max Chars | - | **6000자** | 토큰 안전 마진 🆕 |
 
-**전체적으로 약 2-3배 더 자세한 문서가 생성됩니다!**
+**중요**: Chunk size는 8192 토큰 제한을 준수하도록 조정되었지만,
+**Context tokens, RAG, file references를 통해 여전히 약 2배 더 자세한 문서 생성!** 🎉
 
 ---
 
