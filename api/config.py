@@ -152,7 +152,7 @@ def load_embedder_config():
     embedder_config = load_json_config("embedder.json")
 
     # Process client classes
-    for key in ["embedder", "embedder_ollama", "embedder_google", "embedder_bedrock"]:
+    for key in ["embedder", "embedder_ollama", "embedder_google", "embedder_bedrock", "embedder_bge_m3"]:
         if key in embedder_config and "client_class" in embedder_config[key]:
             class_name = embedder_config[key]["client_class"]
             if class_name in CLIENT_CLASSES:
@@ -174,6 +174,8 @@ def get_embedder_config():
         return configs.get("embedder_google", {})
     elif embedder_type == 'ollama' and 'embedder_ollama' in configs:
         return configs.get("embedder_ollama", {})
+    elif embedder_type == 'bge_m3' and 'embedder_bge_m3' in configs:
+        return configs.get("embedder_bge_m3", {})
     else:
         return configs.get("embedder", {})
 
@@ -235,15 +237,33 @@ def is_bedrock_embedder():
     client_class = embedder_config.get("client_class", "")
     return client_class == "BedrockClient"
 
+def is_bge_m3_embedder():
+    """
+    Check if the current embedder configuration uses BGE-M3.
+
+    Returns:
+        bool: True if using BGE-M3, False otherwise
+    """
+    embedder_config = get_embedder_config()
+    if not embedder_config:
+        return False
+
+    # Check model_kwargs for bge-m3
+    model_kwargs = embedder_config.get("model_kwargs", {})
+    model = model_kwargs.get("model", "")
+    return model == "bge-m3"
+
 def get_embedder_type():
     """
     Get the current embedder type based on configuration.
-    
+
     Returns:
-        str: 'bedrock', 'ollama', 'google', or 'openai' (default)
+        str: 'bedrock', 'ollama', 'google', 'bge_m3', or 'openai' (default)
     """
     if is_bedrock_embedder():
         return 'bedrock'
+    elif is_bge_m3_embedder():
+        return 'bge_m3'
     elif is_ollama_embedder():
         return 'ollama'
     elif is_google_embedder():
@@ -341,7 +361,7 @@ if generator_config:
 
 # Update embedder configuration
 if embedder_config:
-    for key in ["embedder", "embedder_ollama", "embedder_google", "embedder_bedrock", "retriever", "text_splitter"]:
+    for key in ["embedder", "embedder_ollama", "embedder_google", "embedder_bedrock", "embedder_bge_m3", "retriever", "text_splitter"]:
         if key in embedder_config:
             configs[key] = embedder_config[key]
 
